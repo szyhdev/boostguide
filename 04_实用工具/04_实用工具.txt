@@ -1,0 +1,649 @@
+第四章 实用工具
+
+一、noncopyable
+  1、原理
+  2、用法
+  3、实现
+二、ignore_unused
+  1、基本用法
+  2、模板用法
+三、optional
+  1、类摘要
+  2、操作函数
+  3、用法
+  4、工厂函数
+四、assign
+  1、list_inserter
+  2、operator +=
+    1）用法
+    2）实现原理
+  3、operator ()
+  4、generic_list
+  5、初始化容器
+    1）list_of
+    2）map_list_of/pair_list_of
+    3）tuple_list_of
+  6、重复输入
+  7、操作非标准容器
+  8、其他议题
+五、tribool
+  1、类摘要
+  2、用法
+  3、为第三态更名
+  4、比较optional
+六、operators
+  1、基本运算概念
+  2、算术操作符
+  3、基类链
+  4、复合运算概念
+  5、相等和等价
+  6、解引用操作符
+  7、下标操作符
+  8、布尔转型操作符
+  9、二元操作符
+七、exception
+  1、标准库中的异常
+  2、类摘要
+    1）exception
+    2）error_info
+  3、向异常传递信息
+  4、错误信息类
+  5、包装标准异常
+  6、使用函数抛出异常
+  7、获得更多信息
+  8、高级议题
+    1）对异常信息打包
+    2）类型转换
+    3）线程间传递异常
+八、uuid
+  1、类摘要
+  2、用法
+  3、生成器
+    1）Nil生成器
+    2）字符串生成器
+    3）名字生成器
+    4）随机生成器
+  4、增强用法
+  5、转换字符串
+九、config
+  1、编译器字符串化
+  2、静态整型常量
+十、utility
+  1、二进制常量
+  2、调用函数名
+    1）用法
+    2）实现原理
+十一、总结
+
+- 本章介绍Boost库中提供的几个有用的小工具，它们的功能单纯，代码简单，却非常有用
+- 正因为小，所以它们几乎在程序中无处不在，能够使程序运转得更加良好，更加有效率
+- 很多开发团队都曾经编写过自己项目的实用工具类，下面的这些Boost组件可以把程序员从这些乏味的重复工作中解脱出来
+
+一、noncopyable
+
+- noncopyable允许程序轻松地实现一个禁止拷贝的类
+- noncopyable位于boost名字空间，需要包含头文件<boost/noncopyable.hpp>
+
+1、原理
+
+- 在定义一个类时，如果没有明确地定义拷贝构造函数和拷贝赋值函数，编译器会为该类自动生成这两个函数
+- 这样，类就可以自动支持swap、符合容器的拷贝语义、放入标准容器进行处理等，但有时候不需要拷贝语义，希望禁止类实例的拷贝
+
+- C++中的经典惯用法是，将拷贝构造函数和拷贝赋值函数声明为私有的，代码编写很简单
+- 但如果程序中存在大量这样的类，重复这样的代码是相当乏味的，出错的概率也会增大
+
+2、用法
+
+- noncopyable为实现不可拷贝的类提供了清晰的解决方案，从boost::noncopyable派生即可，私有或者公有继承均可，不过，使用私有继承可以更清晰地表明这是一个has-a关系，而不是is-a关系
+- 如果其他程序员试图拷贝构造该类的对象或者进行赋值，编译器将会报错
+- 只要有可能就应该使用noncopyable，它能够清晰地表达类设计者的意图，而且它和Boost库的其他组件配合得很好
+
+3、实现
+
+- noncopyable的实现原理很简单，代码也很少
+  * 拷贝构造函数和拷贝赋值都被声明为私有的
+  * 当从noncopyable派生出新类时，新类的拷贝构造函数和拷贝赋值由于基类的对应函数的私有化而无法被正常使用
+- 如果使用新的关键字default和delete，noncopyable的实现可以更清晰
+
+二、ignore_unused
+
+- 编写代码时经常会遇到一些暂时用不到但又必须保留的变量，编译器会为对此发出警告，虽然使用-Wunused编译选项可以关闭这些警告消息，但这可能带来隐患
+- 古老的办法是，使用(void)var的形式来“使用”一下变量，但这不利于维护
+
+- Boost库的解决方法是ignore_unused
+- ignore_unused位于boost名字空间，需要包含头文件<boost/core/ignore_unused.hpp>
+
+1、基本用法
+
+- ignore_unused的实现很简单，它什么也没有做
+  * ignore_unused使用可变参数模板，支持任意数量、任意类型的变量
+  * 它把变量作为参数“使用”了一下，从而骗过编译器，其效果和(void)var一样
+- 使用ignore_unused可以显式地忽略这些变量，轻松地消除警告信息
+- 和(void)var相比，ignore_unused更容易理解，易于维护
+
+2、模板用法
+
+- ignore_unused还可以用于未使用的局部类型定义
+- ignore_unused的模板用法与其函数用法类似，但不需要函数参数，而是在模板参数列表中写上需要忽略的类型
+
+三、optional
+
+- 在实际开发过程中，经常会遇到无效值的情况，比如，函数并不是总能返回有效值
+- 用数学语言说，就是函数的返回值位于函数的解空间之外
+
+- 表示无效值最常用的做法是增加一个哨兵，比如，NULL、-1、EOF等，但这些方法都不是通用的，而且有时候并不存在这样的哨兵
+- 另一个做法是，使用pair<T, bool>作为返回值，即，通过一个额外的bool变量来指明返回值是否有效
+
+- optional使用容器语义，包装了“可能产生无效值”的对象，实现了未初始化的概念，它已被收入C++17标准
+- optional位于boost名字空间，需要包含头文件<boost/optional.hpp>
+
+1、类摘要
+
+- optional库定义了常量boost::none作为无效值，表示未初始化，它的类型是none_t
+- optional库的核心类是optional，它很像一个只能存放一个元素的容器，实现了初始化的概念，即，如果元素未初始化，该容器就是空的，容器内的值是无效的，否则，容器内的值就是有效的
+
+2、操作函数
+
+- optional的模板类型参数T可以是任何类型，并不要求其具有默认的构造函数，但必须是可以拷贝构造的，因为optional会在内部进行拷贝
+- 创建optional对象的方式
+  * 通过无参的optional或optional(boost::none)构造一个未初始化的对象
+  * 通过optional(v)构造一个已初始化的对象，内部拷贝v的值，如果模板参数是T&，则会持有对该引用的包装
+  * 通过optional(condition, v)根据条件来构造对象，如果条件成立，则将对象初始化为v，否则为未初始化
+  * 从另一个optional对象拷贝构造或赋值
+  * 通过emplace成员函数就地创建对象，避免了构造后再拷贝的代价
+  * 通过将对象赋值为none，使其恢复到未初始化状态
+
+- optional采用指针语义来访问内部保存的元素，可以通过operator bool或operator !来检测其有效性
+- optinal重载了*和->以实现与指针相同的操作，成员函数get和get_ptr分别用来获得元素的引用和指针
+- optional还提供了三个value系列函数，它们更加安全
+  * value：如果对象未初始化，则会抛出异常
+  * value_or(default)：如果对象未初始化，则会返回default，否则返回内部存储的值
+  * value_or_eval(f)：如果对象未初始化，则会返回f的执行结果，否则返回内部存储的值
+- optinal全面支持比较操作，和普通的指针不同，它进行的是深比较，而且加入了对未初始化情况的判断
+
+3、用法
+
+- optional的接口简单明了，把它看作一个大小为1且行为类似指针的容器即可，也可以把它想象为一个类似智能指针的东西
+- 当然，它只是与智能指针的用法类似，但用途不同
+
+4、工厂函数
+
+- optional提供了一个类似make_pair、make_shared的工厂函数，make_optional，它可以根据参数的类型自动推导出optional的类型，从而创建optional对象
+- 不过，make_optional无法推导出T&类型的optional对象，此时无法使用make_optional
+- make_optional也不支持emplace的用法，这可能会造成拷贝的代价
+
+四、assign
+
+- 许多情况下都需要为容器初始化或者赋值，填充一些数据，C++98只提供了容纳这些数据的方法，填充的步骤则相当麻烦
+- assign库重载了赋值操作符+=、逗号操作符,以及括号操作符()，这样就可以用非常简洁的语法方便地对标准容器赋值或初始化
+- C++新标准也提供了类似的初始化功能，但没有assign库这么完备
+- assign库位于boost::assign名字空间，需要包含头文件<boost/assign.hpp>
+
+1、list_inserter
+
+- list_inserter是assign库用来操作容器的工具类，它类似于std::back_inserter，但增加了很多重载运算符和助手类来简化代码
+- list_inserter内部存储了一个函数对象insert_来操作容器，它封装了容器的push_back和push_front等操作
+- list_inserter的成员函数的另一个特点是返回*this，这样就可以进行串联操作，以达到简化代码的目的
+- list_inserter还提供了repeat/range函数来简化输入重复数据的工作
+
+2、operator +=
+
+- 由于list_inserter重载了operator +=和operator ,，可以用简洁到令人震惊的语法来完成原来需要许多代码才能完成的工作
+- 如果不熟悉C++的操作符重载的原理，恐怕都意识不到这些简洁语法背后的复杂工作
+
+1）用法
+
+- 使用assign库必须使用using namespace boost::assign，这样才能让重载的+=、,等操作符在作用域内生效
+- +=可以接若干个可以被容器接纳的元素，元素之间用,分隔，元素不一定是常量，也可以是表达式或者函数调用
+- 比较特别的是map容器，它必须使用make_pair来生成元素，仅仅用括号把pair的两个成员括起来是无效的
+
+2）实现原理
+
+- assign库提供了三个工厂函数，push_back、push_front和insert，它们可以应用于具有同名成员函数的容器，以该容器作为参数，创建对应的list_inserter对象
+- 同时，assign库为标准容器重载了+=操作符，当+=操作符作用于容器时，会调用上面的三个工厂函数，产生一个list_inserter对象，以该对象为起点，调用operator ()和operator ,就可以向容器插入数据
+- 不过，assign库仅重载针对标准容器的operator +=操作符，对于其他类型的容器，需要自行实现
+
+3、operator ()
+
+- operator +=仅适用于标准容器，并且在处理map时有点麻烦，因此，必要时可以直接使用工厂函数insert、push_front和push_back，利用它们返回的list_inserter对象来插入数据
+  * 对于拥有push_back和push_front函数的vector、list、deque，可以使用assign::push_front和assign::push_back
+  * 对于拥有insert函数的set、map，只能使用assign::insert
+- operator ()的好处是，可以在括号中使用多个参数，对于map可以避免使用make_pair函数，如果括号中没有参数，list_inserter对象会调用容器元素的默认构造函数来创建它
+- operator ()可以与operator ,混合使用，非常简单方便
+
+4、generic_list
+
+- list_inserter解决了容器的赋值问题，但有时候需要在构造容器的时候就完成数据的填充，这样比赋值更高效
+- C++11引入了初始化列表std::initializer_list，Boost则通过generic_list提供了和它类似的功能
+- generic_list内部使用deque来存储元素，大多数操作都会被转换为对deque的push_back
+- 和list_inserter类似，generic_list也重载了operator ()和operator ,
+
+5、初始化容器
+
+- assign库提供了三个工厂函数，list_of、map_list_of/pair_list_of和tuple_list_of，它们可以产生generic_list对象，然后就可以像使用list_inserter那样通过operator ()和operator ,来填充数据
+- generic_list提供了容器类型的隐式转换操作，所以，它可以被赋值给任意容器
+
+1）list_of
+
+- list_of可以全部使用operator ()，也可以混合使用operator ()和operator ,，但使用后者时需要将list_of表达式用括号括起来，否则编译器无法推导出它的类型
+
+2）map_list_of/pair_list_of
+
+- list_of对于处理map容器不太方便，于是就有了map_list_of/pair_list_of
+- map_list_of可以接受两个参数，自动构造出std::pair对象并插入到map中
+- pair_list_of纯粹是map_list_of的同义词，两者的用法和功能完全相同
+
+3）tuple_list_of
+
+- tuple_list_of用于初始化元素类型为tuple的容器
+
+6、重复输入
+
+- 在填充数据时会遇到输入重复数据的问题，像前面那样编写大量的重复代码会很麻烦，而且容易引起错误
+- list_inserter和generic_list提供了成员函数repeat、repeat_fun和range来减轻工作量
+  * repeat把第二个参数作为填充的值，重复第一个参数指定的次数
+  * repeat_fun同样重复第一个参数指定的次数，但把第二个参数指定的函数对象的返回值作为填充的值
+  * range用来把一个序列中的全部或部分元素插入到另一个序列
+- repeat、repeat_fun和range同样返回list_inserter或者generic_list，因此，可以对它们串联地调用operator ()和operator ,
+
+7、操作非标准容器
+
+- assign库不仅支持标准容器，包括vector、string、deque、list、set、multiset、map、multimap，也支持容器适配器，包括stack、queue、priority_queue
+  * 由于stack、queue、priority_queue没有push_back和push_front函数，因此，assign库提供了push函数来赋值，其中的stack可以使用operator +=
+  * 初始化时的list_of需要调用to_adapter来适配非标准容器，如果使用operator ,，还需要把整个表达式用括号括起来，然后调用to_adapter
+- assign库也支持大部分Boost库的容器，包括array、circular_buffer、unordered等，只要它们支持push_back、push_front或insert函数且用法与标准容器类似即可
+
+8、其他议题
+
+- assign库还有两个功能类似的函数，ref_list_of和cref_list_of，它们接受变量的引用作为参数来创建初始化列表，比list_of内部使用deque的效率更高
+- assign库还支持Boost库中的指针容器，提供ptr_push_back、ptr_list_of等函数
+
+五、tribool
+
+- tribool类似于C++内建的bool，但它基于三态布尔逻辑，在true和false之外还有一个indeterminate状态，即，不确定状态
+- 三态布尔逻辑的一个实际场景是，在执行某项任务之前，状态是不确定的，启动任务后状态为true，结束任务后状态为false
+- tribool位于boost::logic名字空间，需要包含头文件<boost/logic/tribool.hpp>
+
+1、类摘要
+
+- 类tribool很简单，它在内部实现了三态bool值的表示，除了构造函数，它没有其他成员函数
+- 对tribool的操作都是通过逻辑运算符和比较运算符来完成的
+- 不确定状态indeterminate是一个特殊的tribool值，它与bool值的true和false遵循三态布尔逻辑
+  * 任何与indeterminate的比较运算的结果都是indeterminate
+  * 在与indeterminate的逻辑或运算中，只有true的运算结果是true，其他的都是indeterminate
+  * 在与indeterminate的逻辑与运算中，只有false的运算结果是false，其他的都是indeterminate
+  * indeterminate的逻辑非运算的结果还是indeterminate
+- 自由函数indeterminate可以判断一个tribool是否处于不确定状态
+
+2、用法
+
+- tribool可以像普通bool类型一样使用，只是多了一个indeterminate取值
+  * 如果仅使用true和false两个值，则tribool与bool的用法相同
+  * 但如果需要使用indeterminate，就必须遵循三态布尔逻辑的运算规则
+- 处理tribool的不确定状态时需要注意，它既不是true，也不是false，使用它进行条件判断永远都不成立，需要进行判断时应该使用indeterminate函数
+
+3、为第三态更名
+
+- tribool的第三态类型indeterminate_keyword_t实际上是一种函数指针类型
+- indeterminate只是一个符合indeterminate_keyword_t类型的函数，用来判断tribool对象是否处于第三态的状态，在构造函数中它也只是一个标志，只要是indeterminate_keyword_t类型就将其设置为不确定状态
+
+- tribool允许把indeterminate更改为用户喜欢的名字，这是通过宏BOOST_TRIBOOL_THIRD_STATE完成的，其实它只是定义了一个新的indeterminate_keyword_t类型的函数而已
+  * 由于C++不允许嵌套定义函数，因此，这个宏最好是在全局作用域内使用
+  * 如果在一个名字空间内使用BOOST_TRIBOOL_THIRD_STATE，它定义的函数将成为该名字空间的一个成员，在使用时需要加上名字空间的限定
+
+4、比较optional
+
+- optional<bool>在功能上类似tribool，一个未初始化的optional<bool>同样可以表示不确定的bool值
+  * 但optional<bool>的语义是未初始化的bool，它是一个无意义的值，而tribool的indeterminate是一个已经初始化的有意义的值，它表示不确定状态，二者存在细微但重要的差别
+  * 此外，optional<bool>和tribool在使用方法上也有差别，前者需要以类似指针的方式访问容器中的bool值，而后者则像普通的bool类型一样使用bool值
+- optional支持bool转换操作符，但它检验的是optional是否已经初始化，所以，在bool语境下使用optional时，要注意避免导致意外的错误
+- 选择optional<bool>还是tribool需要由具体的业务逻辑来决定，如果不存在有效的返回值，就选择optional<bool>，如果返回值总是确定的，但可能无法确定其意义，就使用tribool
+
+六、operators
+
+- C++提供了强大的操作符重载的能力，可以重定义大多数操作符的行为，使操作更加简单直观
+  * 但实现操作符重载要比使用它们麻烦得多，因为很多操作符具有对称性，比如，如果定义了operator +，很自然也要定义operator -，完全实现这些操作符是单调乏味的
+  * 实际上，很多操作符是可以通过其他操作符推导出来的，比如，a != b可以通过!(a == b)来实现
+
+- Boost的operators库应运而生，它允许用户在自己的类中仅定义很少的操作符，就可以方便地自动生成其他相关的操作符，并保证实现正确的语义
+- operators位于boost名字空间，需要包含头文件<boost/operators.hpp>
+
+1、基本运算概念
+
+- operators库由多个类组成，分别实现不同的运算概念，这些概念囊括了C++中的大部分操作符
+- operators库提供的常用算术操作符
+  * equality_comparable：要求提供==，可以自动实现!=
+  * less_than_comparable：要求提供<，可以自动实现>、<=、>=
+  * addable：要求提供+=，可以自动实现+
+  * subtractable：要求提供-=，可以自动实现-
+  * incrementable：要求提供前置++，可以自动实现后置++
+  * decrementable：要求提供前置--，可以自动实现后置--
+  * equivalent：要求提供<，可以自动实现==
+
+- 这些概念在库中以同名类的形式提供，用户需要以继承的方式使用它们，私有继承还是公有继承无关紧要，因为这些类都是空类，没有成员变量和成员函数，仅定义了友元操作符
+- 如果要实现多个运算概念就需要使用多重继承技术，从多个概念类派生，对于使用多重继承时的一些问题，需要使用一些技巧来处理
+
+2、算术操作符
+
+- 以类point为例，要实现less_than_comparable，要求point提供operator <
+  * less_than_comparable作为基类，它将派生类point作为自己的模板参数，这看起来像是一个循环继承，实际上，模板参数point只是被用来实现内部的比较操作符
+  * point定义了operator <之后，其他的>、<=、>=由less_than_comparable自动生成
+- 同样地，使用equality_comparable可以定义相等关系，并自动获得了operator !=的定义
+- 注意，在使用概念类时，模板参数必须是派生类本身，当派生类本身也是一个模板类时，不要错写成派生类的模板参数或者忘写了派生类的模板参数
+
+3、基类链
+
+- 多重继承是一个强大的面向对象技术，如果使用不当会引发诸多问题，比如，难以优化、菱形继承等
+- operators使用泛型编程的基类链技术解决了多重继承的问题，它通过模板把多继承转换为链式的单继承
+- operators库的操作符模板类除了可以接受派生类作为比较类型之外，还可以接受另外一个类作为自己的基类，这样就可以把无限多个类串联在一起
+- 基类链技术会在声明基类的末尾处出现一连串的>，编码时一定要小心这些尖括号的匹配
+
+4、复合运算概念
+
+- 基类链技术解决了多重继承的效率问题，但不得不编写很长的基类链代码，因此，operators库把一些简单的运算概念组合成复杂的运算概念，即，复合运算
+- 复合运算不仅简化了代码，而且给出了更明确的语义
+
+- operators库提供的常见复合运算
+  * totally_ordered：组合了equality_comparable和less_than_comparable
+  * additive：组合了addable和subtractable
+  * multiplicative：组合了multipliable和dividable
+  * arithmetic：组合了additive和multiplicative
+  * unit_stoppable：组合了incrementable和decrementable
+- 使用复合运算概念，只需要少量的代码就可以获得完全的算术运算能力
+
+5、相等和等价
+
+- 相等和等价是两个容易混淆的概念，相等基于operator ==，而等价基于operator <，二者在语义上有很大差别
+- 对于简单类型，相等和等价是一致的，但对于大多数复杂类型和自定义类型，由于==和<是两种不同的运算，所以二者具有不同的意义
+- operators库使用equality_comparable和equivalent明确地区分相等和等价这两个概念，前者基于==，而后者基于<，不过令人困扰的是它们都实现了==，表现相同而含义不同
+
+- 当把自定义类作为标准库中的容器的元素使用时，set/map和排序算法使用的是等价关系的operator <，而unordered_set/unordered_map和各种find算法使用的是相等关系的operator ==
+- 如果只关心类的等价语义，那么就使用equivalent，如果要精确地比较两个对象的值，那么就使用equality_comparable
+
+6、解引用操作符
+
+- operators库使用dereferenceable提供了对解引用操作符*和->的支持，它的用法和前面的算术操作符不太相同
+- dereferenceable有三个模板参数
+  * 第一个参数是要实现operator ->的派生类
+  * 第二个参数是operator ->返回的指针类型，通常为T*
+  * 第三个参数是用于基类链技术的基类
+- dereferenceable要求派生类提供operator *，它会自动实现operator ->
+
+- 注意，operator ->的定义不是像算术操作符类中那样的友元函数，所以，必须使用公有继承dereferenceable
+- 由于dereferenceable实现了解引用操作符的语义，所以，它可以用于实现自定义的智能指针类或者代理模式
+
+7、下标操作符
+
+- operators库使用indexable提供了对下标操作符[]的支持，它也属于解引用的范畴，其用法和dereferenceable类似
+  * 第一个参数和第四个参数和dereferenceable的第一个参数和第三个参数相同，分别代表派生类和基类链的基类
+  * 第二个参数是下标操作符的值类型，通常是整型，也可以是其他类型，但它必须能够与第一个参数表示的派生类进行加法操作
+  * 第三个参数是下标操作符的返回值，通常是对一个类型的引用
+- indexable要求派生类提供一个operator +的操作定义，类似于一个指针的算术运算，它应该返回一个迭代器，通过operator *就可以获得其中的值
+
+8、布尔转型操作符
+
+- 转型操作符是C++中一类特殊的操作符，operator bool则更具有特殊性，如果简单地实现bool转型，会由于隐式转换而出现意想不到的问题
+- 为了避免这类问题，可以使用安全的bool惯用法，定义一个到unspecified_bool函数指针类型的转换，C++新标准也在语法层面通过关键字explicit提供了显式转换操作符的概念，而Boost则提供了explicit_operator_bool，这样就可以根据编译器对C++标准的支持程度来选择恰当的解决方案
+
+- explicit_operator_bool不属于operators库，它是core库的一部分，需要包含头文件<boost/core/explicit_operator_bool.hpp>
+- explicit_operator_bool要求派生类实现operator !，同时它还提供了三个相关的宏
+  * BOOST_EXPLICIT_OPERATOR_BOOL：安全bool转型
+  * BOOST_EXPLICIT_OPERATOR_BOOL_NOEXCEPT：异常保证的bool转型
+  * BOOST_CONSTEXPR_EXPLICIT_OPERATOR_BOOL：编译器常量bool转型
+- 根据具体情况实现operator !，然后选择一个宏，就可以实现安全的bool转型操作符
+
+9、二元操作符
+
+- 二元操作符的两个参数一般是同类型的，但有时候它们也可以是不同类型的，比如，point可以与一个整型的标量加减，结果是对每个坐标值都进行标量的加减
+- operators库使用带两个模板参数的概念类来支持这种用法，比如，less_than_comparable<T, U>
+- 对于不支持模板偏特化的编译器，operators库为每个操作符提供额外的两种形式，分别带有后缀“1”和“2”，如果程序可能在不同的编译器上编译，最好使用这些形式
+
+七、exception
+
+- 异常是C++错误处理的重要机制，它改变了传统的使用错误返回值的处理模式，简化了函数接口和调用代码
+- C++定义了标准异常类std::exception及一系列派生类，是整个C++错误处理的基础
+
+- Boost库的exception库对标准库中的exception类的缺陷进行了强化，提供重载的operator <<来向异常传入数据，以增加异常的信息和表达力
+- exception位于boost名字空间，需要包含头文件<boost/exception/all.hpp>
+
+1、标准库中的异常
+
+- C++标准定义了一个异常基类，std::exception以及try/catch/throw机制
+  * 从std::exception派生出若干派生类，用来描述不同种类的异常，比如，bad_alloc、bad_cast、out_of_range等
+  * C++允许抛出任何类型的异常，但在std::exception出现以后，应该尽量使用它，它的成员函数what可以返回与异常有关的信息，这比简单地抛出一个整型错误值或者字符串更好、更安全
+
+- 如果std::exception及其派生类不能满足需要，可以从std::exception派生出自己的类，并为它添加更多的诊断信息
+  * 但如果系统中需要很多不同类型的异常类时，这种方法会给程序员带来编码的沉重负担，因为为了容纳不同的信息需要编写大量相似的代码
+  * 这种办法还有一个问题是，无法获得和异常有关的完全的诊断信息，而标准库的异常一旦被抛出，程序就失去了对它的控制，只能使用它或者再抛出一个新异常
+- 为此，Boost定义了新的异常类boost::exception，完善了C++标准的异常处理机制
+
+2、类摘要
+
+- exception库提供了两个类，exception和error_info，它们是exception库的基础
+
+1）exception
+
+- exception几乎没有公有的成员函数，保护的构造函数说明了它的设计意图，它是一个抽象类，只有它的派生类能够创建和销毁它，以保证exception不被误用
+- exception的重要能力在于它的友元操作符<<，用来存储error_info对象的信息，该信息可以通过自由函数get_error_info获得
+- exception特意设计为没有从std::exception派生，这是为了避免引发菱形继承问题
+
+2）error_info
+
+- error_info提供了向异常类型添加信息的通用方法
+  * 第一个模板参数通常是个空类，只用来标记一个error_info类
+  * 第二个模板参数是真正要存储的数据的类型，该数据可以通过成员函数value来访问
+
+3、向异常传递信息
+
+- exception和error_info被设计为和std::exception一起工作，自定义的异常类也可以安全地从exception和std::exception多重继承，从而同时获得二者的能力
+  * 因为exception被设计为抽象类，所以必须定义派生类才能使用它，而且必须使用虚继承
+  * 不需要为派生类添加成员变量或成员函数，这些工作已经都由exception完成了
+- 接下来需要使用error_info定义异常中存储的信息，这里定义了两个分别存储int和string的error_info，err_no和err_str
+- 当异常发生时，创建一个自定义异常类，并用operator <<向其存储任意信息，这些信息可以通过get_error_info来获得
+- 异常还可以被追加信息，同样是使用operator <<，并被再次抛出
+
+4、错误信息类
+
+- 由于从exception派生的异常类的定义非常简单，没有实现代码，可以很容易建立起自己的异常类体系，每个异常类对应一种错误类型
+- 只要都使用虚继承，任意复杂程度的异常类体系都可以充分地表达错误的含义
+
+- 处理异常的另一个重要工作是，定义错误信息类型
+  * 基本的方法是，使用typedef来具体化error_info模板类，这通常会比较麻烦
+  * 为此，exception库提供了若干预先定义好的错误信息类，可以用于调用API、行号、错误代码、文件名等错误信息的处理
+
+- 此外，exception库还提供了三个预定义错误信息类型，throw_function、throw_file和throw_line，它们主要用于存储源代码信息，配合宏BOOST_CURRENT_FUNCTION、__FILE__、__LINE__一起使用
+- 如果这些预定义类还不能满足要求，只能使用typedef来解决，可以定义一个辅助工具宏，DEFINE_ERROR_INFO，方便快捷地实现error_info的定义
+  * DEFINE_ERROR_INFO接受两个参数，第一个参数是它要存储的类型，第二个参数是它要定义的错误信息的类型
+  * DEFINE_ERROR_INFO使用起来就像在定义一个变量
+
+5、包装标准异常
+
+- exception库提供了一个模板函数，enable_error_info
+  * 它有一个模板参数T，可以是标准异常类或者其他自定义类型
+  * 它可以包装类型T，产生一个从boost::exception和T派生的类，从而在不改变原有异常处理体系的前提下获得boost::exception的所有好处
+  * 如果T已经是boost::exception的派生类，则它直接返回一个该类型对象的拷贝
+- enable_error_info通常用在程序中已经存在异常类的场合，对这些异常类的修改很困难甚至不可能，比如，异常类已经被编译成库，源代码无法改动
+
+- enable_error_info返回的是一个boost::exception和T的派生类，在捕捉异常时，catch的参数可以是这两个类型中的任意一个，但如果要使用boost::exception存储的信息，就必须用boost::exception来捕捉异常
+- enable_error_info也可以用来包装标准库的异常类，比如，enable_error_info<std::runtime_error("runtime")>
+
+6、使用函数抛出异常
+
+- exception库提供了throw_exception函数来简化对enable_error_info的调用，代替原来的throw语句抛出异常，而且支持线程安全，比直接使用throw好
+- exception库还提供了一个有用的宏，BOOST_THROW_EXCEPTION，它会调用boost::exception和enable_error_info，可以接受任意的异常类型，同时使用throw_function、throw_file和throw_line自动添加发生异常的函数名、文件名和行号等信息
+
+- 为了保证与配置宏BOOST_NO_EXCEPTIONS兼容，throw_exception和BOOST_THROW_EXCEPTION都要求参数必须是std::exception的派生类
+  * 对于新写的类这通常不是问题，但如果是旧代码中的非std::exception的派生类就无法使用，这限制了它们的应用范围
+  * 如果可以确保程序中总是使用boost::exception，不配置BOOST_NO_EXCEPTIONS，那么就可以注释掉<boost/throw_exception.hpp>中的throw_exception_assert_compatibility(e)这条语句，以便取消这个限制
+
+7、获得更多信息
+
+- exception提供了方便的存储信息的能力，可以向它添加任意数量的信息，但当使用operator <<多次添加信息后，会导致它内部存储了大量的信息
+- 如果仍然使用get_error_info来逐项检索，会很麻烦甚至无法实现，这时就需要另一个函数，diagnostic_information，它可以输出异常包含的所有信息
+  * 如果异常是由BOOST_THROW_EXCEPTION抛出的，信息可能相当多，对用户并不友好
+  * 但对程序开发者而言，这可以提供很好的错误诊断信息
+
+- exception库还有一个更方便的函数，current_exception_diagnostic_information，它只能在catch块中使用，以字符串的形式返回异常诊断信息，避免了指定异常参数的麻烦
+
+8、高级议题
+
+1）对异常信息打包
+
+- exception支持对异常信息使用boost::tuple进行组合打包，当异常信息类型很多又经常成对出现时，这可以简化异常的编写
+
+2）类型转换
+
+- 模板函数current_exception_cast提供类似标准库的转型操作
+- 和current_exception_diagnostic_information类似，它也只能在catch块中使用，可以把异常对象转换为指向目标类型的指针，如果转换无法成功进行，则返回空指针
+
+3）线程间传递异常
+
+- exception支持在线程之间传递异常，这需要使用exception的克隆能力
+- 使用enable_current_exception或throw_exception包装异常对象都可以使之可以被克隆
+- 当发生异常时，线程在catch块内调用函数current_exception得到当前异常的指针对象exception_ptr，它指向异常对象的拷贝，是线程安全的，可以被多个线程同时拥有且并发修改
+- rethrow_exception可以用来重新抛出异常
+
+八、uuid
+
+- uuid库是一个小的实用工具，它可以表示并生成UUID
+  * UUID是Universally Unique Identifier的缩写，别名是GUID，它是一个128位的数字，用来创建全球唯一的标识符
+  * UUID可以用在很多地方，比如，数据库记录的行ID、系统中的某个用户、网络中的某条消息等
+- uuid位于boost::uuid名字空间，需要包含若干个头文件
+
+1、类摘要
+
+- uuid库使用类uuid来表示UUID
+- uuid全面支持比较操作和流输入输出操作，其中，比较操作是基于字典序的
+
+2、用法
+
+- uuid是一个很小的类，目标是尽量简单，易于操作，因此，它被设计为没有构造函数
+- uuid内部使用一个16字节的数组data来保存UUID的值，该成员是公有的
+  * 成员函数begin和end提供迭代器支持，可以像操作容器一样操作UUID的每一个字节
+  * 成员函数size和静态成员函数static_size返回UUID的长度，它总是16
+- uuid可以被看作一个容量为16、元素类型为unsigned char的容器
+
+- uuid内部定义的枚举类型variant_type标识了UUID的变体号，成员函数variant则用来返回该变体号
+- uuid的生成有不同的算法，这通过枚举类型version_type来标识，成员函数version则用来返回算法的版本
+  * version_time_based：基于时间和MAC的算法
+  * dcs_security：分布计算环境算法
+  * version_name_based_md5：MD5摘要算法
+  * version_random_number_based：随机数算法
+  * version_name_based_sha1：SHA1摘要算法
+- 在数量庞大的UUID中有一个特殊的全0值，nil，它表示一个无效的UUID，成员函数is_nil则用来检测uuid是否为nil
+
+3、生成器
+
+- 通过uuid提供的数组和迭代器接口可以直接写出UUID值，但如果不使用规定的算法，这样手动创建的UUID很容易重复，要创建属于自己的UUID，需要使用UUID生成器
+- uuid库提供了四种生成器，分别是Nil生成器、字符串生成器、名字生成器和随机生成器，它们都是函数对象，重载了operator ()，可以直接调用它们来生成uuid对象
+
+1）Nil生成器
+
+- Nil生成器是最简单的生成器，它生成一个无效的UUID值（全0），它的存在只是为了方便地表示一个无效的UUID值
+- Nil生成器的类为nil_generator，它有一个内联函数nil_uuid，相当于直接调用Nil生成器
+
+2）字符串生成器
+
+- 字符串生成器string_generator可以从一个字符串创建出uuid对象，字符串可以是C字符串、string或wstring，也可以是一对迭代器指定的字符序列的区间
+- string_generator对字符串的格式有严格的要求
+  * 一种是没有连字符的全十六进制数字
+  * 另一种是使用连字符，但必须符合UUID的定义，只能在第5、7、9、11字节前使用连字符，其他位置不允许出现连字符
+  * 还可以用花括号将UUID字符串括起来，但除了花括号不能出现十六进制数之外的其他字符
+
+3）名字生成器
+
+- 名字生成器name_generator使用基于名字的SHA1算法，它需要先指定一个基准的UUID，然后通过名字派生出基于这个UUID的一系列UUID
+- 名字生成器的典型应用场景是，为一个组织内部的所有成员创建UUID标识，只要基准UUID不变，相同的名字会产生相同的UUID
+
+4）随机生成器
+
+- 随机生成器采用随机数来生成UUID，它利用Boost库的另一个组件random作为随机数的发生源，可以产生高质量的伪随机数，保证生成的UUID不会重复
+- basic_random_generator是一个模板类，可以通过模板参数指定要使用的随机数发生器，为了方便使用，uuid定义了一个常用的随机生成器，random_generator，它使用mt19937作为随机数发生器
+
+4、增强用法
+
+- 为了追求效率，uuid没有提供构造函数，要生成一个UUID必须使用生成器，但有时候这个过程显得有些麻烦
+- 从uuid派生出一个可以自动生成UUID值的增强类，可以简化uuid类的使用
+  * 它是uuid的派生类，所以具有uuid的全部能力
+  * 它在内部定义了两个生成器的静态成员函数，分别用来产生随机UUID和字符串UUID，对应地提供了两种重载的构造函数
+  * 对于Nil生成器，它使用带int参数的构造函数来实现
+  * 对于名字生成器则使用带uuid和字符串参数的构造函数来实现
+  * 同时它还提供了uuid类型转换操作符，以便用于需要使用uuid类型的场景
+
+5、转换字符串
+
+- uuid可以通过字符串生成器从字符串生成，也可以通过两个自由函数转换为字符串，to_string和to_wstring
+- 另一个Boost库的组件lexical_cast可以方便地实现字符串与uuid的双向转换，这得益于uuid的流输入输出功能
+- 不过，lexical_cast只能接受连字符格式的字符串，而且字符串中不能包含花括号
+
+九、config
+
+- config主要提供给Boost的库开发者使用，而不是给库用户使用
+- config将程序的编译配置分解为三部分，平台、编译器和标准库，以便解决特定平台和编译器的兼容问题
+- 一般来说，config库不应该被库用户使用，这里介绍几个有用的小工具
+
+1、编译器字符串化
+
+- 宏BOOST_STRINGIZE可以将任意字面量转换为字符串，需要包含头文件<boost/config/suffix.hpp>
+- BOOST_STRINGIZE是一个宏，意味着它仅能用于编译期，不支持运行时转换
+- BOOST_STRINGIZE最常见的用途是，在泛型编程中将编译期的常数转换为字符串，可以被用于调试或输出日志
+
+2、静态整型常量
+
+- C++标准允许直接在类声明中为静态整型变量设置初始值，但并不是所有的编译器都实现了这个特性
+- 如果编译器不支持该特性可以使用enum来变相实现
+- 如果使用BOOST_STATIC_CONSTANT就不必担心编译器的能力限制，代码更具有可移植性，比静态整型变量或enum更清晰，更具可读性
+
+十、utility
+
+- utility库不是一个有统一主题的库，而是包含了若干个很小但很有用的工具的库
+
+1、二进制常量
+
+- BOOST_BINARY提供一组宏，用于实现简单的二进制常量的表示，它类似于C++14标准中的二进制字面量“0bxxx”的用法
+- 使用BOOST_BINARY需要包含头文件<boost/utility.hpp>
+
+- BOOST_BINARY基于boost::preprocessor预处理元编程工具，将一组或多组0和1的数字在编译期展开，使其成为一个二进制数字，每个数组之间用空格隔开，每组可以容纳一至八个数字
+- 除了最基本的BOOST_BINARY，还包含形如BOOST_BINARY_XX的宏，其中的XX是标准的整数扩展，比如U、UL等，用来支持需要特定整数类型的地方
+- BOOST_BINARY提供了很好的初始化操作的方法，在需要按位操作的情况下特别有用，比如，配合std::bitset一起使用，BOOST_BINARY是在编译期展开的，运行时没有任何开销
+
+2、调用函数名
+
+- GCC编译器在C89标准中的__FILE__、__LINE__之外定义了一些扩展宏，其中的__PRETTY_FUNCTION__用来表示函数名称，VC、intel C等编译器也定义了类似的宏
+- C99标准则定义了__func__来实现同样的功能
+- BOOST_CURRENT_FUNCTION宏使用变通的方法为C++补充了该功能
+
+1）用法
+
+- 使用BOOST_CURRENT_FUNCTION需要包含头文件<boost/current_function.hpp>
+- 只要在代码中调用BOOST_CURRENT_FUNCTION，就可以获得该宏的外围函数名称，它是一个包含完整函数声明的编译器字符串
+- 如果BOOST_CURRENT_FUNCTION不位于任何函数作用域内，则其行为依据编译器的不同而不同
+
+2）实现原理
+
+- BOOST_CURRENT_FUNCTION的实现代码其实很简单，针对各种编译器把编译器特定的宏定义为BOOST_CURRENT_FUNCTION即可，因此，它的能力完全依赖于编译器
+- 在配合抛出异常或输出诊断日志时，BOOST_CURRENT_FUNCTION非常有用
+
+十一、总结
+
+- 本章讨论了很多有用的工具，涉及实际开发的方方面面，虽然有些杂乱，但它们确实能极大地提高开发效率并降低代码维护成本
+- noncopyable为定义一个不允许拷贝的类提供了简单而清晰的解决方法，注意，应该总是使用boost::noncopyable的限定形式使用它，而不是使用using打开boost名字空间
+- ignore_unused可以消除一些暂时未使用的变量或类型定义产生的警告，有利于代码后续的维护工作
+- optional使用容器语义为无效值提供了一个很好的解决方案，它类似于容器和智能指针的混合体，可以容纳任意类型的元素并像访问指针一样访问它，注意，在访问之前必须测试其有效性
+- assign提供了重载的括号操作符和逗号操作符，比C++标准提供的初始化列表更强大，能够轻松地完成原本需要一大堆代码才能够完成的初始化任务，对标准容器、容器适配器和Boost容器都提供了全面的支持
+- tribool实现了三态逻辑，和语言内置的bool类型一样好用
+- operators库提供了很多定义良好的模板类，可以简化操作符重载的实现工作，用户只需要通过基类链技术继承它们，就可以轻松地获得其他操作符的功能
+  * 注意，程序员需要保证操作符具有正确的语义，不能违背大多数人的常识
+  * equlity_comparable、less_than_comparable和totally_ordered是最常用的操作符重载类
+  * 应当慎重使用其他操作符重载类，除非它具有明显的语义并能够极大地简化语法
+- exception库是对C++标准的异常体系的补充和完善，可以在异常对象中存储任意数量、任意类型的数据，有助于增强异常的表达能力
+  * boost::exception特意被设计为不从std::exception派生，使得它可以很好地配合现有代码工作，注意，应该用虚继承的方式使用它
+  * exception库还提供了一系列的函数、类和宏，辅助处理和异常有关的问题
+- uuid实现了对UUID的表示和处理，提供了基于名字和随机数的算法来生成唯一的标识符，用来在很多地方唯一地标识对象
+- config库和utility库提供了几个有用的宏
+  * BOOST_STRINGIZE用来实现编译期字符串转换
+  * BOOST_STATIC_CONSTANT用来定义类的静态整型常量
+  * BOOST_BINARY使得二进制数字的书写更加便利
+  * BOOST_CURRENT_FUNCTION用来获得函数名称的字符串
+
+<2022-10-20>
