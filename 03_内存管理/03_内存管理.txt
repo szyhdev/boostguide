@@ -1,0 +1,460 @@
+第三章 内存管理
+
+一、smart_ptr库概述
+  1、RAII机制
+  2、智能指针
+二、scoped_ptr
+  1、类摘要
+  2、操作函数
+  3、用法
+  4、对比标准
+    1）unique_ptr
+    2）make_unique
+三、shared_ptr
+  1、类摘要
+  2、操作函数
+  3、用法
+  4、工厂函数
+  5、应用于标准容器
+  6、应用于桥接模式
+  7、应用于工厂模式
+  8、定制删除器
+  9、高级议题
+    1）对比std::shared_ptr
+    2）显式bool转换
+    3）指针转换函数
+    4）shared_ptr<void>
+    5）删除器的高级用法
+    6）别名构造函数
+    7）owner_less
+四、weak_ptr
+  1、类摘要
+  2、用法
+  3、对象自我管理
+  4、打破循环引用
+五、intrusive_ptr
+  1、类摘要
+  2、用法
+  3、引用计数器
+六、pool库概述
+七、pool
+  1、类摘要
+  2、操作函数
+  3、用法
+八、object_pool
+  1、类摘要
+  2、操作函数
+  3、用法
+  4、更多的构造参数
+九、singleton_pool
+  1、类摘要
+  2、用法
+十、总结
+
+- 内存管理一直是令C++程序员最头疼的工作
+  * C++继承了C语言的高效而灵活的指针，稍有不慎就会导致内存泄漏、指针悬空、访问越界等问题
+  * C++程序员曾经无限向往Java、C#的垃圾回收机制
+- 本章介绍C++中高效的内存管理方法，这些解决方案可能比垃圾回收机制更好
+
+一、smart_ptr库概述
+
+- 计算机系统中有很多种资源，除了经常用到的内存，还有文件、socket、数据库连接等
+- 在程序中，申请这些资源后必须及时归还，否则会产生难以预料的后果
+
+1、RAII机制
+
+- 为了管理内存等资源，程序员通常采用RAII（Resource Acquisition Is Initialization，资源获取即初始化）机制，在构造函数中申请资源，然后使用资源，最后在析构函数中释放资源
+  * 对于在栈上创建的对象，这种RAII机制是可以正常工作的
+  * 但如果对象是通过new操作符在堆上创建的，它的析构函数就无法被自动调用，程序员必须明确地使用delete操作符来释放资源，这意味着存在资源泄露的隐患
+- new、delete以及指针的不恰当使用是C++语言中资源释放问题的根源，即使是熟练的C++程序员也会经常忘记调用delete
+
+2、智能指针
+
+- 向C++中引入异常机制之后，程序员必须保证new的对象能够在适当的时候被delete，因此，不得不到处编写异常处理代码来释放资源
+- 智能指针（smart pointer）可以在退出作用域时，无论是正常退出还是异常离开，总是调用delete来释放它持有的对象
+
+- 最早出现的智能指针应该是C++98中的auto_ptr，它解决了自动释放资源的部分问题
+  * 它可以接受new操作符或者对象工厂创建的对象指针作为参数，从而代理该原始指针
+  * 不过，auto_ptr存在一些缺陷，新的C++标准已经把它废弃了，转而提供了更完善的unique_ptr、shared_ptr和weak_ptr，它们都是基于Boost的smart_ptr库的
+
+- Boost的smart_ptr库提供了多种智能指针，常用的有scoped_ptr、shared_ptr、weak_ptr和intrusive_ptr
+  * 它们都是轻量级对象，执行速度与原始指针相差无几，但却是异常安全的
+  * 它们对所持有的指向T类型的指针仅有一个很小但合理的要求，T的析构函数不能抛出异常
+- 这些智能指针位于名字空间boost，需要包含头文件<boost/smart_ptr.hpp>
+
+二、scoped_ptr
+
+- scoped_ptr是一个与auto_ptr/unique_ptr类似的智能指针
+  * scoped_ptr包装了通过new操作符在堆上分配的对象，并保证在任何时候该对象都会被正确地释放
+  * scoped_ptr对指针的所有权要求比较严格，不能转让，一旦scoped_ptr获得了对象的管理权，就无法再从它那里把管理权收回来
+- scoped_ptr的名字起得很好，它向读者传递了一个信息，只能在当前作用域内使用，不希望、也不允许被转让
+
+1、类摘要
+
+- 拷贝构造函数、operator =都被私有化，不允许进行相关操作
+- operator ==和operator !=也被私有化，不需要这类操作
+- 构造函数被声明为explicit，必须被显式调用
+
+2、操作函数
+
+- scoped_ptr的构造函数接受一个类型为T*的指针，创建一个scoped_ptr对象，并在内部保存该指针
+- scoped_ptr把拷贝构造函数和operator =都声明为私有的，保证它所持有的指针不能被转让
+
+- 成员函数reset删除原来持有的指针，并保存新指针，一般不建议直接调用reset，因为它违背了资源应该由scoped_ptr对象自动管理的原则
+- operator *和operator ->用来模仿被代理的原始指针的行为，使得智能指针可以像原始指针那样被使用
+- operator bool使得智能指针可以在bool语境下被自动转换为bool
+- 成员函数swap可以交换两个scoped_ptr对象保存的原始指针
+- 成员函数get返回scoped_ptr对象保存的原始指针，可以用在必须使用原始指针的场景，不过，这可能使原始指针脱离scoped_ptr对象的控制
+- scoped_ptr仅支持有限的比较操作，不能比较两个scoped_ptr，但可以将scoped_ptr与nullptr进行比较
+
+3、用法
+
+- scoped_ptr使用起来很简单，把原来使用指针变量接受new表达式的地方换成使用scoped_ptr接受new表达式，然后去掉那些多余的try/catch和delete操作就可以了
+
+- 由于scoped_ptr重载了operator *和operator ->，所以可以像使用普通指针那样使用它
+- 不再需要对scoped_ptr持有的指针进行delete操作，scoped_ptr会在必要时自动释放资源
+- 不要试图对scoped_ptr进行delete操作，scoped_ptr是一个对象，而不是指针，这将导致一个编译错误
+
+- 由于不能对scoped_ptr进行拷贝构造和赋值操作，所以scoped_ptr只能在其被声明的作用域内使用，从而保证了指针的安全
+- 由此引出了一个推论，如果一个类包含一个scoped_ptr成员变量，那么它也是不可以进行拷贝构造和赋值操作的
+- 除了operator *和operator ->之外，scoped_ptr没有定义其他运算符，因此，不能对它进行++、--等操作，和普通指针相比，它只提供了很小的接口
+
+- 使用scoped_ptr可以带来两个好处
+  * 一来它可以使代码更加清晰简单，简单意味着更少的错误
+  * 二来它可以在保证安全的基础上获得与原始指针几乎相同的速度
+
+4、对比标准
+
+- unique_ptr是C++标准中提供的新的智能指针，用来取代原有的auto_ptr
+- unique_ptr不仅能用于new创建的单个对象，还可以用于new[]创建的对象数组
+
+1）unique_ptr
+
+- unique_ptr的基本能力与scoped_ptr相同，可以在作用域内管理指针，不允许拷贝构造和赋值操作，但支持移动语义
+- unique_ptr还有一些比scoped_ptr更多的功能，可以像原始指针一样进行比较，可以像shared_ptr那样定制删除器，还可以安全地放入标准容器
+- 因此，如果编译器支持C++11标准，应该毫不犹豫地使用unique_ptr来代替scoped_ptr
+- 相比而言，scoped_ptr的优点是，专注于在作用域内管理指针，不允许转让指针的所有权
+
+2）make_unique
+
+- C++11定义了unique_ptr，却遗忘了对应的工厂函数make_unique，C++14补上了这个缺陷
+- 为此，Boost的smart_ptr库实现了make_unique
+  * 首先，它包含在头文件<boost/smart_ptr/make_unique.hpp>中，而不是包含在<boost/smart_ptr.hpp>中
+  * 其次，它位于名字空间boost中，而不是位于名字空间std中
+- boost::make_unique的用法和C++14标准中的是一样的
+- scoped_ptr不需要也不可能有make_scoped函数，因为它不能拷贝构造，不能赋值，也不能转移
+
+三、shared_ptr
+
+- shared_ptr是最像指针的智能指针，是Boost的smart_ptr库中最有价值、最重要的部分，Boost的许多组件都使用它，所以它毫无悬念地被收入到C++11标准中
+- shared_ptr和scoped_ptr一样包装了new操作符在堆上分配的对象，但它的实现使用了引用计数来进行管理，只有当指针不再被使用时（即，引用计数为0时），它所持有的指针才会被删除
+- 和unique_ptr一样，shared_ptr也可以被安全地放入标准容器，这是在STL容器中存储指针的最标准的用法
+
+1、类摘要
+
+- shared_ptr比scoped_ptr复杂许多
+
+2、操作函数
+
+- shared_ptr和scoped_ptr有很多相似之处，它们都重载了operator *和operator ->来模仿原始指针的行为，提供显式的bool转换来判断指针的有效性，通过get函数获得原始指针，不允许进行指针的算术操作，不能管理new[]分配的数组对象
+- 从shared_ptr的名字可以看出它和scoped_ptr的不同之处，它主要是用来被安全共享的
+- shared_ptr是最全能的智能指针，具有正常的拷贝构造和赋值操作，也可以进行比较
+
+- shared_ptr有多种构造函数，以适应不同的应用场景
+  * 无参的构造函数，创建一个持有空指针的shared_ptr
+  * 获得一个指向类型T的指针的控制权
+  * 从另一个shared_ptr获得一个指针的控制权
+  * 通过赋值操作获得一个指针的控制权
+  * 通过一个额外的参数定制删除器，而不是默认的delete
+  * 别名构造函数用于不增加引用计数的情形
+
+- 成员函数reset用来将引用计数减1，这和scoped_ptr不同
+- 成员函数unique用来检查当前shared_ptr是不是所持有指针的唯一持有者
+- 成员函数use_count返回当前shared_ptr所持有指针的持有者数目，该函数应该仅仅用于调试或测试，它不能提供高效率的操作
+- shared_ptr的比较操作是基于所持有的指针进行的，可以用来比较两个shared_ptr对象是否相等
+- shared_ptr仅提供了operator <来比较不等关系，这样它就可以被用于标准容器了，比如，set和map
+
+3、用法
+
+- 作为最智能的智能指针，shared_ptr的行为最接近原始指针
+- shared_ptr还提供了基本的线程安全保证，可以被多个线程安全读取，但其他访问形式的结果则是未定义的
+- 第一个示例程序示范了shared_ptr的基本用法
+- 第二个示例程序示范了shared_ptr的较复杂的用法
+  * 这段代码定义了一个类和一个函数，它们都接受shared_ptr作为参数，这里没有使用引用传递，而是直接拷贝，就像使用一个原始指针那样
+  * print_func函数内部拷贝了一个shared_ptr对象，引用计数因此而加1，同时，在退出函数时，引用计数减1
+
+4、工厂函数
+
+- shared_ptr很好地消除了显式的delete调用，但这还不够，因为还需要显式的new调用，这会导致代码的某种不对称
+- 通过工厂函数，可以消除使用shared_ptr时的显式new调用，这就是make_shared
+
+- 通常，使用make_shared要比直接创建shared_ptr更快更高效，因为它在内部只分配一次内存
+- 如果编译器支持可变参数模板特性，则make_shared的参数数目没有限制，否则，它最多只能接受10个参数
+- 除了make_shared之外，smart_ptr库还提供了一个allocate_shared函数，它比make_shared多接受一个定制的内存分配器的类型，其他方面二者相同
+
+5、应用于标准容器
+
+- 将shared_ptr用于标准容器的两种方式
+  * 将容器用作shared_ptr的管理对象，比如，shared_ptr<list<T>>，使得容器可以被安全地共享，其用法和普通的shared_ptr没有区别
+  * 将shared_ptr作为容器的元素，比如，vector<shared_ptr<T>>，shared_ptr支持拷贝语义和比较操作，符合标准容器对元素的要求
+- 标准容器不能容纳scoped_ptr，因为它不能拷贝和赋值
+
+- 标准容器可以容纳原始指针，但这样就丧失了容器的很多好处，因为容器无法自动管理指针类型的元素，不得不编写大量的代码来保证指针最终被正确删除
+- 存储shared_ptr的容器与存储原始指针的容器的功能几乎完全一样，但shared_ptr负责指针的管理工作，不用担心资源的泄露
+
+- 在示例程序中，通过对迭代器使用两次解引用（即，*(*pos)），就可以获得真正的值
+  * 使用boost::for_each或者新式的for循环，可以避免对迭代器使用两次解引用
+  * 另外，boost::iterators库还提供了indirect_iterator来简化对容纳shared_ptr的容器的使用
+
+6、应用于桥接模式
+
+- 桥接模式是一种结构型设计模式，它把具体的类的实现细节对用户隐藏起来，以达到类之间的最小耦合关系
+  * 桥接模式也被称为pimpl或handle/body，可以将头文件的依赖关系降至最小
+  * 而且，桥接模式没有使用虚函数就实现了多态
+
+- shared_ptr和scoped_ptr都可以用来实现桥接模式，但shared_ptr更适合，因为它支持拷贝构造和赋值操作，并且可以用于容器
+- 在示例程序中，类sample使用一个shared_ptr成员变量来保存类impl的指针，在类sample中只有类impl的不完整声明，真正的实现被隐藏在类impl中
+- shared_ptr是实现桥接模式的最佳工具，因为它解决了指针的共享问题和引用计数问题
+
+7、应用于工厂模式
+
+- 工厂模式是一种创建型设计模式，封装了对new操作符的使用，使对象的创建集中在工厂类或工厂函数中，make_shared就是一个很好的例子
+  * 编写自己的工厂类或工厂函数通常需要在堆上使用new动态分配对象，如果忘记调用delete，就会造成资源泄露
+  * 要解决这个问题，只需要修改工厂类或工厂函数的接口，使其不再返回原始指针，而是返回包装了原始指针的智能指针shared_ptr，就可以很好地保护资源
+
+- 示例程序定义了一个抽象基类abstract和一个它的派生类impl，工厂函数返回包装了abstract指针的shared_ptr
+  * 当shared_ptr退出作用域时，会自动释放它所持有的abstract指针
+  * 当试图通过shared_ptr的成员函数get获得原始指针并进行delete操作时，会返回一个编译错误，因为类abstract的析构函数被声明为保护的，这意味着只有它自己以及它的子类有权删除它
+  * 虽然可以通过指针强制转换来骗过编译器对shared_ptr进行delete操作，但这样做会在shared_ptr析构时引发未定义的行为，所以，永远也不要这样做
+
+8、定制删除器
+
+- shared_ptr有一个可以接受删除器的构造函数，它将取代delete在析构时对所持有的指针进行操作
+  * 删除器可以是一个函数对象，也可以是一个函数指针，只要能像函数一样对所持有的指针进行调用就行
+  * 对删除器的要求是，它必须可以拷贝，而且不能抛出异常
+- 自由函数get_deleter用来获得shared_ptr内部的删除器指针
+
+- 有了删除器，就可以使用shared_ptr管理任何类型的资源，因为删除器可以确保资源被正确地释放
+  * 比如，使用close_socket函数作为删除器来释放socket资源
+  * 再比如，使用fclose函数作为删除器来释放FILE句柄
+- 删除器使得可以对shared_ptr的行为进行定制和扩展，不仅仅能管理内存，还可以管理其他类型的资源，成为一个万能的资源管理工具
+
+9、高级议题
+
+1）对比std::shared_ptr
+
+- C++11中定义了std::shared_ptr，功能和boost::shared_ptr基本相同，完全可以等价互换
+
+2）显式bool转换
+
+- 早期版本的shared_ptr的bool转换是隐式的，后来为了和C++标准保持一致，才改为显式的
+- 出于兼容性的考虑，C++标准规定在if、assert、for等逻辑判断的语境下，shared_ptr是可以隐式转换的，但对于其他情形，比如，函数参数或者返回值，则必须进行显式转换
+
+3）指针转换函数
+
+- 在编写基于虚函数的多态代码时，指针的类型转换非常有用
+- 但shared_ptr不能通过static_cast<T*>(p.get())来进行转换，因为转换后的指针会脱离shared_ptr的管理
+- 为此，shared_ptr提供了类型转换函数，static_pointer_cast、const_pointer_cast和dynamic_pointer_cast，返回指针类型转换后的shared_ptr
+
+4）shared_ptr<void>
+
+- shared_ptr<void>能够存储void*指针，而void*是可以指向任意类型的，因此，shared_ptr<void>可以容纳任意类型的指针
+- 但将指针存储为void*也就意味着丧失了原来的类型信息，在需要时必须使用static_pointer_cast等类型转换函数将其转换为原来的类型，这会导致不安全的代码，最好不要这样做
+
+5）删除器的高级用法
+
+- 基于shared_ptr<void>来定制删除器，shared_ptr可以带来更惊人的用法
+- 由于void*可以指向任何指针类型，可以为其传递一个nullptr和一个删除void*的函数，执行任何需要的工作
+
+6）别名构造函数
+
+- shared_ptr还有一个比较特殊的构造函数版本，可以共享另一个shared_ptr的引用计数，但它实际持有的是不同的指针，而且它不需要负责该指针的释放
+- 一个实际的应用场景是，通过一个现有的shared_ptr来创建一个新的shared_ptr，但新的shared_ptr指向的却是另一个shared_ptr的内部成员变量
+
+7）owner_less
+
+- 既然存在别名构造函数，单纯地比较两个shared_ptr的原始指针就不再适用，所以，smart_ptr库提供了owner_less
+  * owner_less是一个函数对象，提供基于所有权的比较操作
+  * owner_less定义了严格的弱序关系，可以被用于关联容器
+
+四、weak_ptr
+
+- weak_ptr是为了配合shared_ptr而引入的一种智能指针，它更像是shared_ptr的助手，而不是真正的智能指针，因为它不具有普通指针的行为，没有重载operator *和operator ->
+- weak_ptr的最大作用是协助shared_ptr工作，像一个旁观者那样观测资源的使用情况
+
+1、类摘要
+
+- weak_ptr的接口很小，它是一个“弱”指针，但能够完成一些特殊工作，证明自己的存在价值
+
+2、用法
+
+- weak_ptr可以从另一个shared_ptr或者weak_ptr构造出来，以获得对资源的观测权
+  * weak_ptr没有共享资源，它的构造不会引起引用计数的增加
+  * 同样，它的析构也不会引起引用计数的减少
+- 成员函数use_count用来观测资源的引用计数
+- 成员函数expired用来检查资源是否已经不存在，即，引用计数已经为0，相当于检查use_count() == 0，不过expired的速度更快
+
+- 因为没有重载operator *和operator ->，所以weak_ptr不共享指针，也不能操作资源，这是它“弱”的原因
+  * 不过，weak_ptr可以通过成员函数lock从被观测的shared_ptr那里获得一个可用的shared_ptr对象，把“弱”关系转变为“强”关系，从而可以操作资源
+  * 当然，当成员函数expired返回true时，lock将返回一个持有nullptr的shared_ptr对象
+
+3、对象自我管理
+
+- weak_ptr的一个重要用途是，获得this指针的shared_ptr，使对象能够生产shared_ptr并管理自己
+  * 使用weak_ptr观测this指针，这并不会影响引用计数
+  * 在需要的时候就调用lock函数来获得一个shared_ptr供外界使用
+
+- Boost提供了一个助手类来完成这项任务，enable_shared_from_this
+  * 使用这个类，需要包含头文件<boost/enable_shared_from_this.hpp>
+  * 让需要进行管理的类派生自这个类即可，成员函数shared_from_this用来获得this指针的shared_ptr
+- 注意，不要对普通对象（非shared_ptr管理的对象）调用shared_from_this，这会导致一个运行时错误
+
+4、打破循环引用
+
+- 当代码中出现循环引用时，shared_ptr的计数机制就会失败，导致无法正常释放资源
+- 比如，两个shared_ptr对象都持有对方的引用，它们的计数都会是2，析构时不会调用delete释放资源
+- 这时可以使用weak_ptr，将原来的“强”引用改为“弱”引用，打破引用循环
+
+五、intrusive_ptr
+
+- intrusive_ptr也是一种引用计数型指针，但它和scoped_ptr、shared_ptr不同，需要额外增加一些代码才能使用
+- 它的名字容易引起误解，实际上它并不会“侵入”到代理对象的内部去修改数据
+- 如果现有代码已经有了引用计数机制管理的对象，intrusive_ptr是一个很好的选择，它可以包装现有对象以获得与shared_ptr类似的智能指针
+
+1、类摘要
+
+- intrusive_ptr的接口与shared_ptr很像，支持比较操作以及static_pointer_cast、dynamic_pointer_cast等转型操作
+- 不过，intrusive_ptr不直接管理引用计数，而是通过两个函数间接管理引用计数，intrusive_ptr_add_ref和intrusive_ptr_release
+- intrusive_ptr的构造函数还可以接受一个add_ref参数，如果它为true，表示会增加引用计数，否则，它就相当于一个weak_ptr，只用来简单地观测对象
+
+2、用法
+
+- 为了使intrusive_ptr能够正常工作，必须实现那两个它要求的函数，intrusive_ptr_add_ref和intrusive_ptr_release
+- 在intrusive_ptr_release中，必须检查引用计数，并负责在必要时完成销毁操作，注意，由于参数相关查找（Argument Dependent Lookup，ADL）的原因，应该在类所在的名字空间或者boost名字空间内实现这两个函数
+
+- 利用intrusive_ptr，只需要编写少量的代码，就可以复用现有的数据结构，获得一个和shared_ptr几乎一样的智能指针，这在某些对性能要求比较苛刻的场景中非常有用
+- 使用intrusive_ptr之前应该确定它确实能够带来足够多的好处
+
+3、引用计数器
+
+- 为了进一步简化引用计数的工作，intrusive_ptr在头文件<boost/smart_ptr/intrusive_ref_counter.hpp>中定义了一个辅助类，intrusive_ref_counter
+  * intrusive_ref_counter内部定义了一个计数器变量，m_ref_counter，并使用模板参数来配置一个计数策略类来实现引用计数的增减
+  * 默认的计数策略是线程安全的thread_safe_counter
+- intrusive_ref_counter需要被继承使用，其子类就会自动获得引用计数的能力
+
+六、pool库概述
+
+- 简单地说，内存池会预先分配一块大的内存空间，然后就可以在其中使用某种算法高效地定制内存的分配
+- Boost的pool库基于简单分配存储的思想实现了一个快速、紧凑的内存池库，不仅可以管理大量对象，还可以用作STL的内存分配器
+- 从某种程度上讲，它近似于一个小型的垃圾回收机制，在需要大量分配和释放小对象时效率很高，完全不需要考虑delete
+
+- pool库包括四个组成部分，最简单的pool、分配类实例的object_pool、单件内存池singleton_pool和可用于标准库的pool_alloc
+- 本书只介绍前三个组件
+
+七、pool
+
+- pool是最简单的、最容易使用的内存池类，它可以返回一个简单数据类型（POD）的内存指针
+- pool位于名字空间boost，需要包含头文件<boost/pool/pool.hpp>
+
+1、类摘要
+
+- pool的类摘要很简单
+
+2、操作函数
+
+- pool的模板类型参数UserAllocator是一个用户定义的内存分配器，通常可以直接使用默认的default_user_allocator_new_delete，它使用new[]和delete[]来分配和释放内存
+- pool的构造函数接受一个requested_size参数，用来指明每次分配内存块的大小，该值可以通过成员函数get_requested_size获得
+
+- 成员函数malloc和ordered_malloc类似于C中的全局函数malloc，它通过void*来返回从内存池中分配的内存块，内存块的大小为构造函数中指定的requested_size
+  * 如果内存分配失败，函数会返回空指针，不会抛出异常
+  * malloc从内存池中任意分配一个内存块
+  * ordered_malloc则在分配内存块的同时合并空闲的内存块链表，它的另一个带参数的形式可以分配连续的n个内存块
+- 成员函数is_from用来判断指定的内存块是否是从该内存池中分配出去的
+
+- 成员函数free用来手动释放之前分配的内存块
+  * 一般情况下，内存池会自动管理内存分配，不需要手动调用free
+  * 只有在内存池的内存空间不够时，才需要调用free来释放它们
+- 成员函数release_memory释放内存池中所有未分配的内存，但已分配的内存块不受影响
+- 成员函数purge_memory强制释放内存池中的所有内存，不管是否已被分配
+
+3、用法
+
+- pool很容易使用，它就像C语言中的malloc那样分配并使用内存
+- 除非有特殊要求，不需要调用free来释放内存，pool会统一进行管理
+- 由于pool在内存块分配失败时不会抛出异常，所以，在实际编写代码时严格检查malloc的返回值是否为空指针
+- 不过，pool只能作为普通数据类型的内存池，不能将它用于复杂的类和对象，因为它只分配内存，不调用构造函数
+
+八、object_pool
+
+- object_pool的功能和pool类似，但它是用于类实例的内存池，它会在析构时对所有已分配的内存块调用析构函数，从而正确地释放资源
+- object_pool位于名字空间boost，需要包含头文件<boost/pool/object_pool.hpp>
+
+1、类摘要
+
+- object_pool的类摘要很简单
+
+2、操作函数
+
+- object_pool是pool的派生类，由于是保护继承，它不能使用pool的接口，但它们的基本操作是类似的
+- object_pool的模板类型参数指明了它能够分配的类型，对该类型的要求是其析构函数不能抛出异常
+
+- 成员函数malloc和free分别用来分配和释放内存块，但它们不会调用类的构造函数和析构函数，也就是说，它们操作的是一个原始内存块，里面的值是未定义的，所以应该尽量少调用它们
+- 成员函数construct和destroy才是object_pool的价值所在
+  * construct实际上是一组函数，它们调用malloc分配内存块，然后在内存块上使用传入的参数调用类的构造函数，返回的是一个已经初始化的对象指针
+  * destroy会先调用对象的析构函数，然后再调用free释放内存块
+  * 这两个函数都不会抛出异常，如果内存分配失败，就返回空指针
+- 同样，成员函数is_from用来测试内存块的归属
+
+3、用法
+
+- object_pool的用法也很简单，既可以像使用pool那样使用object_pool，也可以使用construct直接在内存池中分配对象，当然，后一种方法是被推荐的
+
+4、更多的构造参数
+
+- 在默认情况下，使用object_pool的construct时最多只能传递三个参数来创建对象
+- construct没有及时跟进C++的新标准使用可变参数模板来支持任意数量的参数，而是基于宏预处理m4实现了一个变通的机制，即，生成可以接受任意数量参数的construct函数源代码
+  * pool库在目录boost/pool/detail下提供了两个脚本，pool_construct.m4和pool_construct_simple.m4
+  * 只需要简单地为脚本文件传递一个参数n，就可以生成接受n个参数的construct函数
+
+- m4的解决方案显得比较笨拙，而使用C++11的可变参数模板，可以定义一个辅助模板函数来支持任意数量的参数，以彻底解决这个问题
+  * 函数construct可以接受任意数量的参数，第一个是object_pool对象，随后是创建对象所需的参数，要创建的对象的类型可以通过object_pool的内部定义element_type来获得
+  * 该函数先调用object_pool的malloc分配一个内存块，然后调用placement new操作符来创建对象
+
+九、singleton_pool
+
+- singleton_pool的接口与pool完全一致，可以用来分配简单数据类型（POD）的内存指针，不过它是一个单件
+- singleton_pool位于名字空间boost，需要包含头文件<boost/pool/singleton_pool>
+- singleton_pool默认使用Boost的thread库来提供线程安全保证，所以需要链接boost_thread库，如果不使用多线程，可以在包含头文件之前定义宏BOOST_POLL_NO_MT
+
+1、类摘要
+
+- singleton_pool的类摘要很简单
+
+2、用法
+
+- singleton_pool有两个模板参数
+  * 第一个参数用来标记不同的单件，可以是空类，甚至可以只进行声明
+  * 第二个参数等同于pool构造函数中的requested_size，用来指明分配的内存块的大小
+- singleton_pool的成员函数都是静态的，因此不需要singleton_pool的实例
+- 因为singleton_pool是单件，所以它的生命周期和程序一样长，除非手动调用release_memory或purge_memory，否则singleton_pool不会自动释放占用的内存
+
+十、总结
+
+- 内存管理是C++程序开发中永恒的话题
+  * 因为C++没有垃圾回收机制，小心管理内存等系统资源是每一个程序员必须面对的问题
+  * C++标准提供了unique_ptr、shared_ptr和weak_ptr，减轻了程序员的内存管理负担，但它们并没有解决所有的问题
+- 本章介绍了Boost的smart_ptr库和pool库
+
+- smart_ptr库提供了几种智能指针，可以有效地消除new和delete的显式使用，减少甚至杜绝资源泄露
+  * scoped_ptr是最容易学习和使用的一个，它类似于unique_ptr，但其所有权很明确，它只能在声明的作用域内使用，不能转让，也不能复制
+  * shared_ptr是所有智能指针中最智能的一个，它不仅能够管理内存，还可以管理其他系统资源，它有很多用法，包括用于桥接模式、用于工厂模式、定制删除器、别名构造等
+  * 工厂函数make_unique和make_shared进一步消除了代码中的new操作符
+  * weak_ptr是一个弱引用，它能够观测shared_ptr但不影响其计数
+  * intrusive_ptr为自行实现引用计数智能指针提供了通用技术方案
+
+- pool库实现了高效的内存池，用于管理内存资源
+  * pool库提供了pool、object_pool、singleton_pool等内存池，适用于不同的情形，完全可以当作一个小型的垃圾回收机制来使用
+  * object_pool可以统一管理对象的创建与销毁
+  * pool库还提供了一个底层的实现类，simple_segregated_storage，它实现了简单分隔存储的管理机制，可以作为自行实现内存池类的很好的起点
+
+<2022-9-30>
