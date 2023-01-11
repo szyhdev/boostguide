@@ -1,0 +1,920 @@
+第七章 容器和数据结构
+
+一、array
+  1、类摘要
+  2、操作函数
+  3、用法
+  4、能力限制
+  5、初始化
+  6、对比标准
+二、dynamic_bitset
+  1、类摘要
+  2、创建与赋值
+  3、容器操作
+  4、基本运算
+  5、访问元素
+  6、类型转换
+  7、集合操作
+  8、综合运用
+三、unordered
+  1、散列集合的简介
+  2、散列集合的用法
+    1）基本用法
+    2）C++标准
+  3、散列映射的简介
+  4、散列映射的用法
+    1）基本用法
+    2）C++标准
+  5、高级议题
+    1）内部数据结构
+    2）支持自定义类型
+四、bimap
+  1、类摘要
+  2、基本用法
+  3、值的集合类型
+  4、集合类型的用法
+  5、使用标签类型
+  6、使用assign库
+  7、查找与替换
+  8、投射
+  9、高级议题
+    1）视图的值类型
+    2）值的集合类型扩展
+    3）关系的集合类型
+五、circular_buffer
+  1、类摘要
+  2、用法
+  3、环形结构
+  4、空间优化
+六、tuple
+  1、二元组
+  2、类摘要
+  3、创建与赋值
+  4、访问元素
+  5、比较操作
+  6、流输入/输出
+  7、联结变量
+  8、内部结构
+  9、使用访问者模式
+  10、高级议题
+    1）代替struct
+    2）tuple的辅助类
+    3）正确地运用tie
+    4）应用于assign库
+    5）应用于exception库
+    6）对比标准
+七、any
+  1、类摘要
+  2、访问元素
+  3、用法
+  4、简化操作
+  5、保存指针
+  6、高级议题
+    1）应用于容器
+    2）对比标准
+八、variant
+  1、类摘要
+  2、访问元素
+  3、用法
+  4、访问器
+  5、高级议题
+    1）对比any
+    2）对比标准
+    3）二元访问器
+    4）BOOST_VARIANT_ENUM_PARAMS
+九、multi_array
+  1、类摘要
+  2、用法
+  3、改变形状和大小
+  4、创建子视图
+  5、适配普通数组
+  6、高级议题
+    1）用序列指定维数
+    2）设置索引基数
+    3）禁用全局对象
+    4）更灵活地生成子视图
+十、property_tree
+  1、类摘要
+  2、读取配置信息
+  3、写入配置信息
+  4、更多用法
+  5、数据格式
+    1）XML
+    2）JSON
+    3）INI
+    4）INFO
+  6、高级议题
+    1）使用其他路径分隔符
+    2）异常
+十一、总结
+
+- 容器是C++标准库中最引人注目的地方
+  * C++98提供了vector、deque、list、set和map，实现了最常用的动态数组、双端队列、双向链表、集合和映射
+  * C++11又新增了array、forward list和unordered
+  * 这些容器均以泛型的形式提供，可以容纳任意类型的元素
+
+- Boost库基于相同的设计理念，实现了几个新型的容器，包括散列、循环队列、多维数组等，扩展了容器的概念和外延，其中，array和tuple已被收入C++标准
+- 本章介绍10个容器，首先是array、dynamic_bitset、unordered、bimap和circular_buffer，然后是tuple、any和variant，最后是multi_array和property_tree
+- 上述这些容器都对元素类型有一个基本要求，析构函数不能抛出异常，有的容器还要求元素具有默认构造函数和拷贝构造函数
+
+一、array
+
+- array包装了C++语言内建的数组，为其提供了标准接口，比如，begin、front等，它在性能上和原始数组相差无几，在程序对性能要求较高或者不需要动态数组的情况下，应该使用array
+- 现在array已经是C++标准的一部分了
+- array位于名字空间boost，需要包含头文件<boost/array.hpp>
+
+1、类摘要
+
+- array的大部分成员函数都只有一行内联代码，这使它很容易被编译器优化
+- array的接口很简单，类似于vector
+
+2、操作函数
+
+- array的模板参数指明了元素的类型和数目
+- array包装了C++语言内建的数组，提供和标准容器类似的接口
+  * begin、end：容器区间的开始迭代器和结束迭代器
+  * cbegin、cend：和begin、end的功能相同，不过是常量迭代器
+  * rbegin、rend：容器区间的开始和结束的逆向迭代器
+  * front、back：容器的第一个和最后一个元素
+  * size、max_size：容器的大小，由于是静态数组，所以二者的值总是相等
+  * empty：判断容器是否为空，由于是静态数组，所以总是返回false
+
+- array重载了operator []，可以像vector那样通过下标来访问元素
+- 成员函数at类似于operator []，不过它有范围检查的功能，当索引值越界时会抛出异常
+- 成员函数c_array和data可以返回内部的数组指针，适用于需要使用原始指针的场合，二者的功能基本相同，但c_array是非标准的，而data返回的是常量指针，因此，不能通过该指针改变容器的元素
+
+- array还提供了以下函数
+  * operator =：使用std::copy实现了赋值操作
+  * swap：高效地交换两个array对象
+  * fill、assign：fill使用std::fill_n为容器的所有元素赋值，而assign是非标准的
+- array还重载了operator ==、operator <、operator >等比较运算符，可以使用字典顺序对两个array对象进行比较
+
+3、用法
+
+- array需要在模板参数中指明数组元素的类型和数量，其使用方式和vector或者普通数组没有太大差别
+- 实际使用中，可以把array看作普通数组，只是多了一些标准函数，以便搭配标准算法，它是一个更方便的数组
+
+4、能力限制
+
+- array本质上是对一个静态数组的封装，因此，它不完全符合标准容器的定义，不具备标准容器的很多功能，虽然用起来很像标准容器
+  * array没有构造函数，不能指定大小和初始值，只能通过模板参数指定大小，然后调用fill/assign填充
+  * 没有push_back和push_front，因为它不能动态增长
+  * 不能搭配使用插入迭代器适配器，因为它不能动态增长
+- 因此，array适用于已知数组大小或者对运行效率要求很高的地方，如果需要动态变动数组的大小，应该使用std::vector
+
+5、初始化
+
+- array虽然没有构造函数，但它可以像普通数组那样通过{}进行初始化
+- array也可以和assign库的list_of配合工作，但它没有insert、push_back、push_front等函数，所以无法对它调用assign库中的同名函数
+
+6、对比标准
+
+- array被收入C++标准后做了一些修订，所以，std::array和boost::array不完全相同
+  * std::array使用noexcept关键字保证不抛出异常
+  * std::array使用constexpr替代static以保证函数在编译时能够进行优化
+  * std::array没有c_array、assign和operator =
+  * std::array支持被作为tuple来使用
+- 总体来说，二者的差别很小，通常可以互换使用
+
+二、dynamic_bitset
+
+- C++标准为处理二进制数值提供了两个工具，vector<bool>和bitset
+  * vector<bool>是对元素类型为bool的vector的特化，它的内部并不存储bool，而是存储二进制位，并且能够动态增长，但它不是容器，尽管大多数情况下它的行为和标准容器一致
+  * 和vector<bool>类似，bitset也是存储二进制位，能够提供更多的二进制位运算，但它的大小是固定的，不能动态增长
+
+- boost::dynamic_bitset弥补了二者的不足，它类似std::bitset，既能够提供丰富的二进制位运算，其大小又是动态可变的
+- dynamic_bitset位于名字空间boost，需要包含头文件<boost/dynamic_bitset.hpp>
+
+1、类摘要
+
+- dynamic_bitset的接口和行为与std::bitset基本相同，唯一的区别是，它的大小是在构造函数中通过参数指定的，并且可以在运行时改变
+- 和C++标准的vector<bool>、bitset一样，dynamic_bitset也不是严格意义上的容器，比如，它不提供迭代器支持，即，没有begin、end等方法
+
+2、创建与赋值
+
+- dynamic_bitset的模板参数
+  * Block：用来存储二进制位的整数的类型，必须是一个无符号整数类型，默认为unsigned long
+  * Allocator：内存分配器，默认为std::allocator<Block>
+  * 一般情况下，不需要改变这两个类型参数，默认类型就可以很好地工作
+
+- 创建dynamic_bitset对象
+  * 不带参数的构造函数创建一个大小为0的dynamic_bitset对象
+  * 在构造函数中指定大小和初始值
+  * 从另一个dynamic_bitset对象拷贝构造
+  * 从由0和1组成的string构造，但不能是C字符串
+- 使用BOOST_BINARY可以构造一个编译期的二进制数，它的效率比使用string的构造效率更高
+- dynamic_bitset按照从高到低的顺序存储二进制位，即，第0个元素存储的是最低位
+
+3、容器操作
+
+- 通过成员函数resize，可以在运行时调整dynamic_bitset的大小，扩展或收缩都是允许的，并且可以使用true/false或1/0来为扩展后的新元素指定默认值
+  * 扩展或收缩时，容器内原有的二进制位保持不变，如果是扩展，新增的位会被置为指定的值，如果是收缩，多余的位会被抛弃
+  * 为resize传入参数0可以将dynamic_bitset中所有的二进制位删除，不过，调用clear会更快一些
+- 成员函数size和empty分别用来返回当前的二进制位的个数和判断容器是否为空
+- 成员函数num_blocks返回所有二进制位占用的Block的数量
+
+- dynamic_bitset可以像vector那样通过成员函数push_back向容器的末尾（最高位）追加一个值
+- 成员函数append提供了添加值的另一个方法，它把一个整数转换为Block后添加到容器的末尾，容器的大小会增加一个Block的长度
+
+4、基本运算
+
+- 和vector<bool>类似，dynamic_bitset也运用了代理技术，重载了[]和|等操作符，可以像普通数组那样访问其中的二进制位，并进行位运算
+- 同时，dynamic_bitset还提供了各种比较操作符，可以对两个dynamic_bitset对象进行比较
+
+5、访问元素
+
+- 除了通过operator []直接访问元素之外，dynamic_bitset还提供了一些成员函数来测试或反转二进制位，包括test、any、none、count、set、reset、flip等，最后三个函数有无参数和带参数两个版本，前者操作所有的二进制位，后者操作指定的二进制位
+- dynamic_bitset还提供了成员函数来进行查找操作，包括find_first、find_next等
+- 由于dynamic_bitset不是容器，不提供迭代器，所以这两个函数返回的不是迭代器对象，而是索引，类型为size_t
+
+6、类型转换
+
+- 成员函数to_ulong用来将dynamic_bitset内部存储的二进制位转换为一个类型为unsigned long的整数
+- 使用to_ulong的前提是，内部存储的二进制位没有超过unsigned long的最大值，否则，转换就会失败
+- 当dynamic_bitset无法转换为unsigned long时，可以使用自由函数to_string将其转换为一个字符串
+- 函数dump_to_string和to_string类似，但它会把dynamic_bitset内部所有Block存储的二进制位都转换到字符串中
+
+7、集合操作
+
+- dynamic_bitset容纳的是0和1，这使它很适合于表示集合
+- 对于基本的集合运算，dynamic_bitset并没有提供专门的成员函数，因为它们可以通过位运算来实现，比如operator &和operator |分别对应交集和并集
+- dynamic_bitset为子集运算提供了两个成员函数，is_subset_of和is_proper_subset_of，用来检查一个对象是不是另一个对象的子集和真子集，使用它们的前提是两个对象中的元素数量必须相等，否则会引发异常
+
+8、综合运用
+
+- 示例程序展示了如何使用筛法求素数
+  * 质数，又称为“素数”，是指只能被1和它本身整除的数，否则就是合数
+  * 0和1既不是素数，也不是合数
+- 筛法求素数的原理很简单，首先确定一个整数集合，然后逐步筛选出不符合要求的整数，最后剩下的就是素数
+  * 首先，通过用户输入的整数确定要筛选的整数区间，然后，创建dynamic_bitset对象
+  * dynamic_bitset可以动态指定大小，这是它比bitset优越的地方
+
+三、unordered
+
+- 散列是非常重要的一种容器，它通常能提供比二叉树方式更高的访问效率
+  * C++98并未规定散列容器，但这并不妨碍编译器厂商实现自己的散列容器，hash_set、hash_map这样的名字被普遍采用
+  * 为了避免与现有名字冲突，C++标准选择了unordered_xxx这样的名字，这个名字更好地体现出散列是无序的
+- 因为散列是无序的，所以，元素不需要提供operator <，而是提供了operator ==，这比标准关联容器的要求放宽了一些
+- boost::unordered库提供了一个完全符合C++标准的散列容器实现，包括无序集合和无序映射，它们位于boost名字空间，需要包含头文件<boost/unordered_set>或<boost/unordered_map>
+
+1、散列集合的简介
+
+- unordered库的两个散列集合类是unordered_set和unordered_multiset，它们的接口与C++标准库中的set/multiset相同，但内部实现使用散列表代替了二叉树，因此，其查找复杂度从对数降为常数
+- 和std::set相比，unordered_set增加了一个计算散列值的模板类型参数，通常是boost::hash，最好不要改变它
+- 比较谓词参数使用的是std::equal_to，而不是std::less，这是因为散列容器不需要保持有序，所以也没有rbegin/rend等迭代器操作
+
+2、散列集合的用法
+
+- unordered_set具有和std::set相同的功能，包括size、empty、count、find等，大多数情况下unordered_set都能与std::set互换
+- 唯一需要注意的是，由于散列容器是无序的，不能对其进行binary_search、lower_bound、upper_bound这样的算法，unordered_set本身也不提供这样的成员函数
+
+1）基本用法
+
+- 首先，初始化散列集合，并通过迭代器遍历输出
+- 然后，调用size获得容器的大小，并用clear清空集合
+- 接着，再用insert插入两个元素，并用find进行查找
+- 最后，调用erase删除一个元素
+- 注意，unordered_set也可以直接进行比较运算
+
+2）C++标准
+
+- 除了上述基本用法之外，unordered_set与C++标准的散列容器完全兼容，支持移动语义和emplace方法
+- 如果编译器不支持新标准，就会采用变通的方法模拟实现，比如，boost.move库和预处理元编程
+- 移动语义可以高效地拷贝对象，而emplace可以直接使用若干参数来创建对象并插入到容器中，避免了复制对象的代价
+- emplace方法的两种形式
+  * emplace直接使用参数构造元素并插入容器，返回值和insert一样是个pair
+  * emplace_hint要求额外提供一个插入的迭代器位置，元素会被插入到该位置之后，但C++标准对此定义未作强制性要求
+
+3、散列映射的简介
+
+- unordered库的两个散列映射类是unordered_map和unordered_multimap，它们的接口与C++标准库中的map/multimap相同，但内部实现使用散列表代替了二叉树，模板参数多了散列计算函数，比较谓词使用equal_to
+
+4、散列映射的用法
+
+- unordered_map属于关联容器，它采用std::pair来保存key-value形式的数据，可以将其理解为一个关联数组，提供operator []，用法与std::map完全相同
+
+1）基本用法
+
+- unordered_map和unordered_multimap的用法相似，不过，由于后者允许有重复的key-value映射，所以不提供operator []
+
+2）C++标准
+
+- unordered_map同样支持emplace方法，但因为它持有的是pair，所以用法略有不同
+- C++标准改进了std::pair，增加了分段构造的方式
+- unordered_map完全模仿了该实现，并在boost::unordered名字空间定义了piecewise_construct_t类型和它的一个实例
+
+5、高级议题
+
+1）内部数据结构
+
+- unordered库使用bucket来存储元素
+  * 散列值相同的元素被放入同一个桶中
+  * 散列容器的当前桶数可以通过成员函数bucket_count获得，而bucket_size用来返回桶中的元素的数量
+- 当散列容器中有大量元素时，为了提高性能，unordered库会为其自动添加桶
+- 程序员不能直接指定桶的数量，但可以通过构造函数或者rehash函数指定最小的桶数
+
+- 散列容器还提供了一个函数max_load_factor，可以获得或设定散列容器的最大负载因子，即，桶中的最大平均数量
+- 通常最大负载因子都为1，用户不必去改变它，过大或过小都没有意义
+
+2）支持自定义类型
+
+- 要使unordered库支持自定义类型，需要定制模板类的第二个和第三个参数，也就是说，要提供散列函数和比较谓词
+- 比较谓词很容易实现，unordered库使用std::equal_to，所以，只要自定义类型实现了operator ==即可，如果需要使用特别的相等判断操作，可以额外实现一个函数对象或者lambda函数
+- 散列函数则是必须实现的，可以使用boost::hash库来计算自定义类型的散列值，最简单的方法是，编写一个hash_value函数，创建一个hash函数对象，然后调用它的operator ()来获得散列值
+
+四、bimap
+
+- C++标准提供了映射容器map和multimap，它们相当于关联数组，把一个元素（key）映射到另一个元素（value），但这种映射关系是单向的
+- Boost的bimap扩展了标准库的映射型容器，提供了双向映射的能力
+- bimap位于名字空间boost，需要包含头文件<boost/bimap.hpp>
+
+1、类摘要
+
+- bimap是一个具有复杂内部结构的类，基于Boost的multi_index库实现
+
+2、基本用法
+
+- bimap可以容纳两个类型的元素，它是这两种类型的元素的关系的集合，这种关系有两个视图，左视图和右视图，分别用left和right访问，相当于两个方向的map
+- bimap的左视图和右视图的基本用法和map相同，但也有一些区别
+  * 由于bimap具有双向性，它的key-value对必须是唯一的，任何重复的值都导致无效的操作
+  * 不管是左视图还是右视图，迭代器返回的都是常量对象，不能像map那样修改value的值
+  * bimap不能使用operator []和at，不能作为关联数组被使用
+- bimap有两个内部类型，value_type和relation，它是bimap的关系集合的元素的类型，可以在不使用左视图和右视图的情况下像操作集合元素一样插入元素
+
+3、值的集合类型
+
+- bimap以自然的方式扩展了映射的语义，将标准库的map和multimap的key-value映射关系扩展为左组和右组两个集合类型的映射关系
+- 在这个概念下，map和multimap的左组是一个有序的集合，而右组则没有任何约束，它们分别对应bimap<set_of<X>, unconstrained_set_of<Y>>和bimap<multiset_of<X>, unconstrained_set_of<Y>>
+
+- bimap定义的一些集合类型
+  * set_of：可以用作键，有序且唯一，相当于map
+  * multiset_of：可以用作键，有序但不唯一，相当于multimap
+  * unordered_set_of：可以用作键，无序且唯一，相当于unordered_map
+  * unordered_multiset_of：可以用作键，无序但不唯一，相当于unordered_multimap
+  * list_of：不可用作键，序列集合，没有对应的标准容器
+  * vector_of：不可用作键，随机访问集合，没有对应的标准容器
+  * unconstrained_set_of：不可用作键，无任何约束，没有对应的标准容器
+- 默认情况下，bimap使用set_of
+- 这些集合类型的定义位于名字空间boost::bimaps，它们不在头文件<boost/bimap.hpp>中，而是在各自的同名头文件中
+
+4、集合类型的用法
+
+- bimap的集合类型引入了很多变化，使bimap产生了大量的组合
+  * 如果要使用双向映射，左组和右组必须都是有序的
+  * 如果有一组是无序的，就没有该方向上的映射视图
+  * 如果两组都是无序的，就只能用bimap的集合视图来访问元素
+
+- 声明一个无序但不唯一的bimap，它的左组和右组都可以插入任意重复的值
+- 声明一个右组的集合类型是序列集合或者随机访问集合的bimap，那么它只能使用左视图，但它有一个优点，可以对左视图使用operator []或at，就像操作一个关联数组，当然，如果左组的类型是multiset_of或者unordered_multiset_of，则不能使用operator []
+- 声明一个左组和右组都不是set类型的bimap，那么左视图和右视图都无法使用，一般很少会这样做
+
+5、使用标签类型
+
+- bimap的左视图和右视图很方便，也很容易理解，但它缺乏具体的含义，无法准确表达其用途，当程序中存在多个bimap实例时，很容易造成混乱
+- 最简单的解决办法是，使用注释来说明bimap的用途及其左视图和右视图的含义，但这并不是根本的解决办法
+- bimap可以使用类bimaps::tagged来为左组和右组在语法层面上添加标签，从而清晰地说明左视图和右视图的含义
+
+- 标签实际上是对bimap的集合数据类型的一个包装
+  * 加了标签的数据可以直接作为bimap的key或value使用，也可以配合集合类型使用
+  * 加了标签后的bimap仍然可以使用left和right访问左视图和右视图，同时，还可以使用模板成员函数by<tag>通过标签来访问左视图和右视图
+- bimap的许多操作都支持使用标签，其用法和普通的左视图和右视图差不多，只需加上标签即可，这样使用起来更清楚，不容易出错
+  * 左视图和右视图的访问变为map_by<left>()和map_by<right>()
+  * 迭代器的访问变为pos->get<left>()和pos->get<right>()
+
+6、使用assign库
+
+- bimap的接口兼容STL，因此，很容易使用assign库为其赋初值，使用时需要注意bimap的左视图和右视图的集合类型，以便选择恰当的assign库工具
+  * 如果左视图是个multiset，可以使用assign的insert来为其赋值
+  * 如果右视图是个vector_of，可以使用assign的push_back来为其赋值，同理，如果右视图是个list_of，那么还可以使用assign的push_front来为其赋值
+- 注意，在boost::bimaps名字空间中存在同名的list_of，因此，使用assign库的list_of时需要加上名字空间来限定
+
+7、查找与替换
+
+- 当bimap的左视图和右视图是set时，可以像std::map那样调用成员函数find根据键来查找元素
+- bimap可以通过视图的成员函数replace_key来替换键，也可以使用成员函数replace_data来替换值
+- bimap还使用了Boost的lambda库提供更快速的修改函数，modify_key和modify_data，注意，如果因为集合类型的约束导致修改失败，被修改的元素会被删除，使用时要多加小心
+  * 要使用modify功能，需要包含头文件<boost/bimap/support/lambda.hpp>，它会用到bimaps名字空间中定义的占位符，_key和_data
+  * 再次强调，由于这里bimap的左组和右组均为set，不允许有重复的值，如果修改操作违反了这个约束，将会导致数据丢失
+
+8、投射
+
+- bimap提供了三个成员函数来将迭代器分别投射到左视图、右视图和关系视图上，project_left、project_right和project_up
+- 这些成员函数允许用户以一种视图进行查找，然后转换到另一种视图上进行其他操作
+
+9、高级议题
+
+1）视图的值类型
+
+- 通过视图插入元素时可以使用make_pair，也可以使用视图的内置类型bimap::left_value_type或bimap::right_value_type，它们通常比make_pair的速度更快，因为可以避免调用对象的拷贝构造函数
+- 如果使用了标签，那么值类型就是bimap::map_by<left>::value_type和bimap::map_by<right>::value_type
+
+2）值的集合类型扩展
+
+- bimap的值的集合类型除了可以接受数据类型作为模板参数之外，还可以接受其他模板参数，就像标准容器那样，比如，set_of还可以接受一个比较谓词、unordered_set_of可以接受一个散列函数对象等
+- 使用该功能可以让bimap具有更多的灵活性，容纳更多的自定义类型，扩大使用范围，但也会使bimap的声明和用法变得更加复杂，所以应该只在必要时才这样用
+
+3）关系的集合类型
+
+- 除了左组和右组两个模板类型参数之外，bimap还可以接受更多的模板参数，第三个模板参数可以指定bimap的集合视图保存关系的形式，默认为left_based，也可以修改为list_of_relation、set_of_relation或unordered_set_of_relation
+- 恰当地配置关系的集合类型和值的集合类型可以获得更快的索引速度
+- 与值的集合类型的扩展一样，bimap为此提供了大量的可配置项，通过不同的搭配可以获得许多组合，这会使bimap的复杂度成倍提高
+
+五、circular_buffer
+
+- circular_buffer实现了循环缓冲区，支持标准的容器操作（比如，push_back）
+- circular_buffer的缓冲区的大小是固定的，当到达容器的末尾时，将自动循环利用容器另一端的空间
+- circular_buffer位于名字空间boost，需要包含头文件<boost/circular_buffer.hpp>
+
+1、类摘要
+
+- circular_buffer是一个符合标准规范的容器，它具有一个内存分配器的模板类型参数，通常不应该改变它
+
+2、用法
+
+- circular_buffer被设计成一种可以与标准容器无缝结合使用的容器，实现了一个固定大小的循环队列，就像一个deque和stash的混合体
+  * 可以像双端队列那样执行push_back、push_front、insert等操作
+  * 也可以像栈那样执行pop_back、pop_front等操作
+  * 它具有标准容器的共通功能，比如，获取大小、获取迭代器、删除元素等
+
+3、环形结构
+
+- circular_buffer的特殊之处在于它内部存储数据的方式
+  * 它的存储空间不是动态增长的，而是循环使用的
+  * 可以把它想象为一个首尾相连的环，当元素的数量达到容器的容量上限时，将自动重用最前面的存储空间
+- circular_buffer为这种环形结构提供了一些特殊的操作函数
+  * full：判断缓冲区是否已满
+  * linearize：把缓冲区线性化为一个连续的普通数组
+  * is_linearized：判断缓冲区是否已经被线性化
+  * rotate：从指定的迭代器位置旋转整个缓冲区
+- 注意，虽然circular_buffer是循环的，但它的迭代器不是循环的，只会在begin和end之间有效
+
+4、空间优化
+
+- circular_buffer在创建时一次性分配所需的内存，这是标准容器通常的做法，但对循环缓冲区来说不一定最合适
+- circular_buffer库还提供了一个circular_buffer_space_optimized，它是circular_buffer的适配器，只在确实需要时才分配空间，并且在元素减少时自动释放空间
+- circular_buffer_space_optimized的用法和circular_buffer几乎相同
+- 当需要容纳大量的元素但多数情况下仅需要保存少量元素时，就可以使用circular_buffer_space_optimized，它可以有效减少内存的占用
+
+六、tuple
+
+- tuple定义了一个有固定数目元素的容器，其中的每个元素的类型可以不相同，这是和其他容器的本质区别
+  * tuple很有用，它是std::pair的泛化，可以用来从函数返回任意数量的值，也可以代替struct来组合数据
+  * boost::tuple通过库的方式为C++增加了这种有用的数据结构，现已被收入C++标准，但它和C++标准中的并不完全相同
+- tuple位于名字空间boost，需要包含头文件<boost/tuple/tuple.hpp>
+
+1、二元组
+
+- std::pair是tuple的特例，是仅持有两个成员的元组
+  * std::pair的两个成员可以通过first和second来访问
+  * std::pair重载了所有的比较运算符，只要元素支持比较，std::pair对象之间就可以比较
+  * make_pair用来创建std::pair对象，它能够根据参数自动推导出类型
+- std::pair是标准库中很多组件的基础，比如，map和multimap使用它来保存不同元素之间的映射关系
+- Boost库的很多组件也使用了std::pair，比如，正则表达式中的sub_match
+
+2、类摘要
+
+- tuple是std::pair的泛化，同样具有容纳不同类型元素的功能
+- tuple的类声明很简单，但它的用法并不简单
+
+3、创建与赋值
+
+- tuple默认支持最多10个模板类型参数，即，最多可以容纳10个不同类型的元素，对于绝大多数应用来说，这已经足够了
+  * tuple对元素的类型没有特殊的要求，但如果元素不支持默认构造或赋值操作，tuple也会缺失相应的功能
+  * tuple的元素也可以是tuple，即，tuple支持嵌套定义
+- tuple的构造函数和std::pair的差不多，可以直接输入多个值来构造，也可以从另一个tuple对象拷贝构造
+- 如果tuple中的元素是引用类型，就必须在初始化时赋予其初值
+  * 对于元素类型是void或者函数类型（不是函数指针）的情形，由于元素没有实例，所以，对应的tuple对象也无法实例化
+  * 当然，如果元素类型是void*或者函数指针，则没有问题
+
+- 为了能够方便地创建tuple对象，tuple库提供了和make_pair类似的函数，make_tuple，它也能够根据参数自动推导出类型，默认情况下是非引用类型
+- 如果需要为tuple中的元素使用引用类型，就要使用ref库中的ref和cref，它们可以对变量进行包装，以满足引用类型的需要
+
+4、访问元素
+
+- tuple提供了成员函数get来访问内部的值，它以整数为索引来返回tuple中的第N个元素
+  * 用来作为索引的整数必须是一个在编译时可以被确定的值，使用变量则会导致编译错误
+  * 如果索引超过了tuple中的元素个数，也会导致编译错误
+- 模板成员函数get的尖括号内是一个表示元素位置的整数，这很像operator []的语法形式，但不能使用变量，同时，不要忘记在它之后的圆括号
+- 除了成员函数get，tuple库还提供了一个自由函数boost::get，它的用法和同名的成员函数相同，只是需要一个tuple变量作为参数
+  * 事实上，boost::get才是真正实现访问tuple内部元素的地方，成员函数get会调用它
+  * C++标准中的std::tuple则没有提供成员函数get
+
+5、比较操作
+
+- tuple全面支持比较操作，它会把比较操作转发给内部的每个元素，然后依次进行比较
+  * 每个元素都必须能够执行该比较操作，否则会引发编译错误
+  * 进行比较的两个tuple对象必须具有相同的元素数目，否则也会引发编译错误
+- tuple的大小比较是基于字典顺序的，而且是短路操作，即，一旦得出比较结果就立即停止
+- 要使用tuple的比较操作，需要包含头文件<boost/tuple/tuple_comparison.hpp>
+
+6、流输入/输出
+
+- tuple支持C++的流输入/输出操作，它会对每个元素逐个调用operator <<或operator >>，这和比较操作类似
+- 如果元素不支持流输入/输出操作，就会引发一个编译时错误
+- 要使用tuple的流输入/输出操作，需要包含头文件<boost/tuple/tuple_io.hpp>
+
+- tuple的默认流输入/输出格式是用圆括号包围整个tuple，每个元素用空格隔开
+- tuple库在名字空间boost::tuples中定义了三个流格式操作函数，用来改变默认的流输入/输出格式，包括set_open、set_close和set_delimiter
+
+7、联结变量
+
+- tuple库提供了一个tie函数，它可以把变量“联结”到tuple对象上，以创建一个元素类型全部都是引用的tuple对象，tie(a, b)相当于make_tuple(ref(a), ref(b))，可以被用于左值
+- tie可以方便地利用现有变量创建一个可赋值的tuple对象，从而对tuple执行“解包”操作，这在接收函数返回的tuple对象时特别有用
+- tie不仅可以用于tuple，还可以用于std::pair
+
+- 关于tie还有一个特殊的对象，tuples::ignore，它相当于一个占位符，用来在赋值时忽略某些元素
+- 当只关心tuple中少数元素的值时，就可以使用tuples::ignore，从而避免书写一堆必须声明但又不使用的变量
+
+8、内部结构
+
+- tuple的内部是一个部件（cons）的链表，cons位于名字空间boost::tuples中
+- 通过cons的模板类型参数，tuple使用了类似operators库的基类链技术，通过链式继承实现类型的容纳
+  * tuple<int, double, string>在概念上相当于cons<int, cons<double, cons<string, null_type>>>
+  * 基类链的尾部是一个null_type，它是一个空类，起到“哨兵”的作用
+
+- tuple利用cons提供了两个很有用的函数，get_head和get_tail，它们分别返回tuple的首元素和尾部链表的引用
+- 前面提到试图在for循环中通过调用模板函数get来遍历tuple是不可行的，但可以通过get_head和get_tail来递归地访问tuple内的元素
+- 为了使递归能够终止，需要有一个处理null_type的模板特化函数
+
+9、使用访问者模式
+
+- 使用tuple的部件链表形式可以很容易地以递归方式遍历tuple，这种方法很值得进行规范化
+- 使用访问者模式可以封装对tuple的递归操作，它能够分离数据的表示和操作
+- 由于C++的模板类不能自动推导参数，而能够自动推导参数的模板函数又不支持偏特化，因此，这个访问者并不是很完美
+  * 访问者函数visit_tuple泛化了对tuple的递归操作，增加了一个模板类型参数Visitor，这是一个可以被调用的函数对象
+  * print_visitor是一个访问者函数对象，它向标准输出打印元素的值
+  * 为了终止递归，还需要实现visit_tuple针对null_type的重载形式
+
+- 使用类似的方法，可以实现对tuple的更多操作，比如，查找tuple中的最大元素
+  * 首先，设置初始的最大值
+  * 然后，把该最大值的引用地址传递给max_visitor对象
+  * 接着，调用访问者函数visit_tuple来遍历tuple中的元素，这一次传递的是max_visitor，而不是print_visitor
+  * 最后，将最终的最大值结果打印到标准输出
+
+10、高级议题
+
+1）代替struct
+
+- tuple的实现很紧凑，它的构造函数和访问函数都是内联的，很容易被编译器优化
+- 一个tuple和一个持有相同元素的struct的运行性能几乎一样，完全可以用tuple来代替struct
+- 使用tuple的代码更简洁，它提供了很多立即可用的操作元素的方法，而struct必须自己定义成员访问函数和操作函数
+
+- 不过，由于tuple使用了模板技术，即使很少量的代码也会带来大量的模板实例化推演，从而导致编译时间的增加
+- 但一般来说，大型项目中tuple的编译时间只占很小的一部分，这部分时间带来的影响完全可以被tuple带来的好处抵销
+
+2）tuple的辅助类
+
+- tuple库在boost::tuples名字空间提供了两个辅助类，element和length，用来获得tuple的一些相关信息
+  * element<N, T>::type可以给出tuple中第N个元素的类型
+  * length<T>可以给出tuple中的元素数量
+
+3）正确地运用tie
+
+- 使用tie来交换变量值时，需要保证右边的tuple为非引用类型，否则结果是错误的
+- 使用tuple来交换变量值的做法并不优雅，也不高效，但这提供了一种新思路
+
+4）应用于assign库
+
+- assign库提供了一个初始化工具，tuple_list_of，它可以初始化元素类型为tuple的容器，使用方法和map_list_of、pair_list_of等类似
+- assing库中还有一些函数需要使用make_tuple或tie来创建可插入到容器中的tuple对象
+
+5）应用于exception库
+
+- exception库利用tuple将多个信息打包成一个tuple，然后一次性完成对所有错误信息的创建，并传递给boost::exception
+
+6）对比标准
+
+- 现在tuple已经是C++标准库的一部分，但boost::tuple并没有及时更新，所以，它们之间存在一些差异
+- 和boost::tuple相比，C++标准中的tuple具有以下一些特性
+  * 支持右值引用和移动语义
+  * 使用可变参数模板，支持不限数量的类型
+  * 兼容std::pair，具有互操作性
+  * 提供swap成员函数，支持交换操作
+  * 提供forward_as_tuple和tuple_cat工厂函数
+  * 没有成员函数get
+  * 元函数tuple_element和tuple_size分别对应boost::tuple中的element和length
+- 使用boost::tuple时要注意这些问题，以避免产生不可移植的问题
+
+七、any
+
+- any是一种特殊的容器，它只能容纳一个元素，但该元素的类型可以是任意类型，包括int、double、string、标准容器、自定义类型等
+- any可以用来保存任意类型的数据，并在需要时将它取出
+- any的这种功能和shared_ptr<void>有点类似，但any是类型安全的，它已被收入C++17标准
+
+1、类摘要
+
+- any不是一个模板类
+  * any能够容纳任意类型的元素的原因是，它的构造函数和赋值函数都是模板函数，可以接受任意类型的元素，并把它保存到内部的模板类holder中
+  * 从这个意义上讲，any实际上是个包装类
+- any的析构函数会删除内部的holder对象，但如果类型是指针，它并不会对指针进行delete操作，这样会造成内存泄漏，解决的方法是，使用智能指针存入any容器
+
+- 空的any构造函数创建一个空的any对象，不持有任何值
+- 成员函数clear可以清空any对象，empty则用来判断any对象是否为空，type用来返回对象的类型信息，它是一个type_info的引用
+
+2、访问元素
+
+- any本身没有提供任何访问内部元素的函数，访问内部元素是通过any_cast完成的，它的命名模仿了标准库的转型操作符xxx_cast
+- any_cast的用法也类似标准库的转型操作符，它会返回any中存储的元素的拷贝，如果目标类型是一个引用，则返回的也是该元素的引用
+- 如果要转换的类型不是any的内部元素的类型，或者any不持有任何元素，则上述转换会抛出一个bad_any_cast异常，它是std::bad_cast的派生类
+- 当any以指针的形式传递给any_cast时，返回的指针类型与传入的any对象具有相同的常量性，但如果要转换的类型不是any的内部元素的类型，或者any不持有任何元素，它不会像前面那样抛出异常，而是返回一个nullptr
+
+3、用法
+
+- any的类接口很小，因此也很容易使用，它的出现使C++的强类型语法检查失去了作用，C++仿佛成为了一种弱类型的语言
+- 一个any对象可以被初始化或赋值为任意类型的值
+- 在为any对象赋值后，通过any_cast可以取回存入的值
+- 在any中保存指针时需要注意，由于空指针对于any也是有效的，所以在使用any_cast取出指针的值后，需要测试其有效性
+- 尽量避免在any中保存原始指针，这存在内存泄漏的危险
+
+4、简化操作
+
+- any提供的操作函数只有any_cast，因此，有必要自己编写一些辅助类和函数来增加它的使用价值
+  * 首先，需要判断any持有的类型，这可以利用any提供的类型函数type来完成
+  * 接下来，需要返回any的内部元素的引用，这样就可以将其用作左值，直接修改any对象
+  * 最后，需要返回any内部的值的指针
+- 这些辅助函数比直接使用any_cast的效果更好，名字简单易懂，也易于维护
+
+5、保存指针
+
+- 需要在any对象中保存指针时，应该使用智能指针对原始指针进行包装，以便在any对象析构时安全地释放资源
+- 不是所有的智能指针都可以作为any存储的对象，比如，scoped_ptr，它不能被拷贝，不符合any的要求，正确的做法是使用shared_ptr
+- 为了更安全地在any中存储shared_ptr，可以自己实现一个工厂函数，make_ptr_any，它封装了any使用shared_ptr的用法，简化了调用接口
+
+- 在使用any_cast来访问any中存储的指针时，注意要在any_cast的模板参数中指明shared_ptr，而不是原始指针的类型
+- 为了简化上述访问操作，可以再实现一个辅助函数，get_shared，它直接返回一个shared_ptr的引用
+
+6、高级议题
+
+1）应用于容器
+
+- any可以用于那些要保存的值的类型是未知的应用程序中
+- 当容器的元素类型为any时，容器就像一个可以持有多种不同类型的对象的动态tuple
+- 可以使用assign库来对any容器进行初始化
+
+- 如果需要一种数据结构，它既具有tuple那样容纳任意类型的能力，又可以在运行时动态调整大小，就可以以any作为元素类型来搭配使用容器
+- any用于容器的典型例子是后序章节要介绍的property_tree和program_options，它们使用any来存储类型未知的属性值
+
+2）对比标准
+
+- Boost中的any已经很长时间没有更新了，所以它和C++17中的any存在一些差异
+  * emplace用来直接使用参数构建对象
+  * reset清空对象
+  * has_value检测any是否持有值，它是empty的反义词
+  * 提供了工厂函数make_any
+- 总体上说，二者的差异并不大，使用者可以自行评估
+
+八、variant
+
+- variant与any有些类似，它是一种可变类型，是对C/C++中联合体的增强和扩展
+  * 普通的联合体只能持有POD类型，不能持有string、vector等复杂类型，variant则没有这个限制
+  * variant已被收入C++17标准
+- variant位于boost名字空间，需要包含头文件<boost/variant.hpp>
+
+1、类摘要
+
+- variant的接口和any类似，但它是一个模板类
+- 和any是个无界类型不同，variant是个有界类型，即，variant保存的数据的类型必须在模板参数列表中声明，其形式很像tuple，它对这些类型的最低要求是可以拷贝构造且析构函数不抛出异常
+  * 无参数的构造函数会用第一个模板参数的默认构造函数来初始化variant的值
+  * 带参数的构造函数的参数可以是模板类型参数中的任一类型，此时variant的值会用该类型的默认构造函数来初始化
+- variant支持拷贝构造和赋值，赋值操作要求模板类型参数也都支持赋值操作
+- variant的成员函数empty和type的用法与any中的相同，但empty永远返回false，因为variant不能为空，成员函数which则用来返回当前值的类型在模板参数列表中的索引号
+- variant提供了比较操作符，这使它可以被用作关联容器的元素或者用于排序，但前提是它的模板类型参数也都是可比较的
+
+2、访问元素
+
+- 访问variant的元素比较方便，它可以直接访问元素的值
+- variant没有提供variant_cast函数，而是使用一个Boost库中的自由函数get来访问内部的元素，这是因为variant的设计出发点不同，它的目的是存储多个数据的联合，而不是用作任意类型的容器
+  * get函数的声明与any_cast类似，用法也基本相同
+  * 如果variant当前的值不是get要取出的类型，则它会抛出boost::bad_cast异常，它是std::exception的派生类，但没有使用Boost库的exception进行包装，而如果使用的是get的返回指针的形式，那么此时会返回一个空指针
+
+3、用法
+
+- variant的模板类型参数的数量最多是20个
+- 很多构造函数和赋值函数可以用来创建variant对象或为其赋值
+- 如前所述，成员函数empty是无意义的，它总是返回false，它的存在是为了兼容any，使得泛型代码可以把variant当作any一样进行处理，成员函数type的功能与any的同名函数相同
+- variant对象不需要像联合体那样通过.操作符来访问内部成员，它就像一个普通的数据类型那样被使用，和any相比，它支持更多的操作，比如，比较、流输出等
+- 使用自由函数get也可以获得variant的值，不过，必须确保其模板参数的类型和variant中当前值的类型一致
+
+4、访问器
+
+- 可以像使用any那样使用variant，先通过type检查variant的类型，然后再进行实际的操作
+  * 不过，这种方式使用了RTTI技术，效率较低
+  * 而且,如果variant的模板参数发生了变化，这些代码也需要相应地进行修改
+- 为此，variant基于访问者模式提供了模板类static_visitor，其构造函数和析构函数都被声明为保护的，所以只能被继承使用
+  * 首先，实际的访问器从static_visitor继承，重载operator ()，用来访问variant的值
+  * 为了能够处理variant的所有可能的类型，operator ()被声明为模板函数，用来处理普通类型
+  * 如果variant新增了一个vector<int>的类型，只需要为访问器增加一个针对vector<int>重载的operator ()即可
+
+- 将访问器对象应用于variant对象需要使用函数apply_visitor，它具有多种重载形式
+  * 最常用的形式是接受一个访问器对象和一个variant对象，它会在内部针对variant对象调用访问器对象的operator ()
+  * 还有一种形式只接受一个访问器对象，返回一个新的apply_visitor_delayed_t对象，这个新的对象包装了原来的访问器对象，可以延后对variant对象的访问，比如，被用于标准库的算法
+
+5、高级议题
+
+1）对比any
+
+- variant很像any，它们都可以容纳一个可变类型的元素，不过，variant是有界类型，其元素类型的范围由用户确定，而any是无界类型，可以容纳任意类型的元素
+- 有的人认为variant没有存在的必要，因为any的功能比它更强，但这是一种错误的认识
+  * any的类型的自由意味着程序员有更多的责任来进行类型安全方面的检查，variant的所有允许的类型都在模板参数列表中指定，这样就可以在编译期进行类型检查
+  * variant还提供了泛型的访问者模式来访问内部的元素，这导致variant在实际使用时与any的根本不同
+  * variant和any是两个互有关联但不能相互替代的容器，尽管在很多方面它们比较相像
+
+2）对比标准
+
+- variant在被收入C++17之后做了一些修改，所以，std::variant和boost::variant之间存在一些区别
+  * emplace用来直接使用参数构建对象
+  * index取代了which
+  * 使用访问器访问variant对象时，访问器不必从某个特定的类派生
+  * 元函数variant_size用来获得variant的元素类型的数量
+
+3）二元访问器
+
+- 同时操作两个variant对象的访问器也是允许的，在某些情况下这很有用
+- 二元访问器同样要从static_visitor派生
+- 函数apply_visitor也支持使用二元访问器来延后访问variant对象
+
+4）BOOST_VARIANT_ENUM_PARAMS
+
+- 如果编译器不支持可变参数模板的特性，那么在编写variant的泛型代码时，就不得不手动编写N个含有从1到N个类型的variant类型
+- 为了简化这种代码的编写，variant库提供了宏BOOST_VARIANT_ENUM_PARAMS，它使用了预处理元编程技术，会被展开为BOOST_VARIANT_LIMIT_TYPES的参数序列，每个参数都被追加一个从0开始的后缀，默认为20个
+
+九、multi_array
+
+- 虽然多维数组在实际应用中没有一维数组那么普遍，但多维数组也是很有用的
+- 尽管可以使用vector<vector<T>>来代替多维数组，但使用起来还是不够方便
+
+- multi_array库解决了这个问题，它是一个多维容器，高效地实现了STL风格的多维数组，比原始的多维数组或者vector<vector<T>>更好用
+- multi_array位于名字空间boost，需要包含头文件<boost/multi_array.hpp>
+
+1、类摘要
+
+- multi_array很像标准容器，具有类似标准容器的大部分接口
+- multi_array是递归定义的，它的每个维度都是一个multi_array，最底层的是一个一维的multi_array，因此，multi_array是组合模式的具体应用
+
+2、用法
+
+- multi_array的模板参数和标准容器类似，但在元素类型之外，还多了一个用来指定维度的模板参数
+- 除了维度之外，还需要指定每个维度的具体值，这是通过类extent_gen和一个预定义的实例extents来实现的，它重载了operator []，就像一个原始多维数组
+- 成员函数num_dimensions返回multi_array的总维数，shape则返回一个常量指针，里面包含每个维度的具体值
+
+- multi_array重载了operator []，可以像使用普通数组那样访问内部的元素
+- 访问多维数组的另一种方式是，把一个位置索引序列传递给operator ()，multi_array会从序列中提取出位置索引来直接访问元素，某些情况下这种方式比operator []的效率更高
+- multi_array还提供了一个成员函数data，它返回指向内部元素的指针，其中包含了所有的元素，而num_elements可以获得元素的总数
+
+3、改变形状和大小
+
+- 使用成员函数reshape可以改变多维数组的形状，即，改变每个维度的大小，但总维数和元素的数量保持不变，这意味着变动前后的各个维度的乘积保持不变
+- reshape接受一个维度序列作为参数，std::vector、std::array或者boost::array都可以，通常array会更快
+
+- 使用成员函数resize可以改变多维数组的大小，动态增减每个维度的元素的数量，但总维数还是不能变，因为它是在模板参数中指定的
+- resize既可以接受一个维度序列作为参数，也可以接受extents表达式
+- 在变动维度的大小时，multi_array会重新分配内存
+  * 原来的元素会被复制到新分配的内存中，然后被析构
+  * 新增的元素使用默认的构造函数来构建
+  * 如果元素的数量变少了，则原来的多余元素会被删除
+
+4、创建子视图
+
+- 多维数组的操作比较复杂，所以，可以通过为其创建一个只能查看其一部分数据的子视图来进行简化
+- 子视图级可以拥有和原来的多维数组一样的维数，也可以少于原来的维数，后一种情况被称为多维数组的“切片”，以便于处理
+
+- 这里需要使用类index_gen的预定义实例indices来定义子视图的索引范围
+  * indices重载了operator []来定义范围，但它的参数不是单一的整数，而是一个multi_array<T, N>::index_range对象，返回一个multi_array<T, N>::array_view<N>::type类型的子视图
+  * multi_array的子视图本身也是一个multi_array，但不能改变其形状和大小
+- 使用indices时还可以改变子视图的步长，这样可以跳过某些列的数据，成员函数strides用来返回每个维度的步长
+- 创建多维数组的切片与创建子视图的过程类似
+  
+5、适配普通数组
+
+- 有时候需要把一个一维数组适配成多维数组来进行处理
+- 为此，multi_array提供了两个类multi_array_ref和const_multi_array_ref，它们可以把一段连续内存中的的原始数组适配成多维数组
+  * 适配后的多维数组除了不能动态增长，其他方面都与multi_array完全相同，比如，调用reshape来改变形状
+  * const_multi_array_ref的功能相对较少，因为它是只读的，不能改变数组中元素的值
+
+6、高级议题
+
+1）用序列指定维数
+
+- 除了使用extents对象之外，multi_array还支持另一种创建对象的方法，为构造函数传递一个维度序列，该序列必须使用array或者vector，通常前者更快
+- 使用序列的方式通常比使用extents对象更快，更节省内存，而且有助于编写与维度无关的代码
+
+2）设置索引基数
+
+- multi_array的索引是从0开始的，但它也提供了多种方式来变更索引基数
+- 在创建多维数组时，可以使用extent_range对象来指定索引范围，以代替简单的整数维度的定义
+- 成员函数reindex可以在创建多维数组之后随时更改索引基数，可以传入一个整数来更改所有的维度的索引基数，也可以传入一个整数序列，按序列中的值逐个更改每个维度的索引基数
+- 成员函数index_bases返回包含每个维度的索引基数的数组指针
+
+3）禁用全局对象
+
+- 在创建多维数组时会用到extents和indices，它们是定义在匿名名字空间中的“全局”对象，相当于两个静态全局变量，只能在源文件中引用
+- 如果项目中的很多地方都使用了multi_array，就会有很多个extents和indices对象，构造它们会带来一定的开销
+- 通过在包含头文件<boost/multi_array.hpp>之前定义宏BOOST_MULTI_ARRAY_NO_GENERATORS可以禁止它们的预定义，这时，可以改用维度序列的方式来创建多维数组
+
+4）更灵活地生成子视图
+
+- index_range还有很多其他功能，善用它可以使子视图和切片的工作更加简单
+  * 不带参数的index_range构造函数表示该维度的所有索引值
+  * index_range还重载了比较操作符，通过比较操作符可以指定维度的索引的范围
+
+十、property_tree
+
+- property_tree是一个保存了多个属性值的树形数据结构，它可以使用类似路径的简单方式访问任意节点的属性，并且可以用类似STL的方式遍历每个子节点
+- property_tree特别适用于处理应用程序的配置数据，它可以解析XML、JSON、INI和INFO等格式
+- property_tree位于名字空间boost::property_tree，要使用它及其XML解析组件，需要包含头文件<boost/property_tree/ptree.hpp>和<boost/property_tree/xml_parser.hpp>
+
+1、类摘要
+
+- property_tree的核心类是basic_ptree
+- basic_ptree的接口很像std::list，此外它还增加了操作属性树的get、get_child、get_value、data等操作
+- basic_ptree有两个重要的内部类型定义，self_type和value_type
+  * self_type是basic_ptree模板类实例化后的类型，也是子节点的类型
+  * value_type是节点的数据结构，它是一个std::pair，first是节点的属性名，second是节点本身
+  * 这意味着basic_ptree使用了组合模式，是由多个basic_ptree组成的集合
+- 和basic_string一样，通常不会直接使用basic_ptree，而是使用定义好的ptree、wptree、iptree、wiptree，这里的i表示忽略大小写，w表示支持宽字符
+
+2、读取配置信息
+
+- 要解析XML配置文件，首先，调用read_xml函数解析XML文件并初始化ptree，它有两种重载形式，分别接收文件名和输入/输出流
+- 然后，使用成员函数get通过路径就可以获得节点的值，模板参数用来指明节点属性的类型，该函数可以指定默认值，如果节点未找到，则返回默认值
+- 对于有多个子节点的节点，需要使用get_child先获得子节点，然后再像使用标准容器那样通过迭代器遍历每个子节点
+
+3、写入配置信息
+
+- property_tree不仅能读取配置信息，还可以写入配置信息
+- 写入配置信息的操作函数和读取的操作函数具有对称性，即，put用来修改节点的值，如果节点不存在，就相当于新增节点，否则，就修改节点
+- put函数通常不需要指定模板类型参数，因为属性值可以用来进行类型推导
+- 对节点修改完毕后，需要调用write_xml保存配置信息，它还有一种形式是向流中写入数据
+- 如果要向属性树中添加新节点，也可以使用add函数
+
+4、更多用法
+
+- basic_tree有一部分接口完全符合标准容器规范，使用起来就像一个std::list<string, ptree>
+- 不过，这些接口使用起来不像get那么方便，比如，find不能实现深层次的查找
+- 除了基本形式和默认值形式，get函数还有一种默认值形式，get_optional，它使用了optional库来包装返回值
+- 同样，用来直接获取节点值的get_value函数也有get_value_optional的形式
+
+5、数据格式
+
+- property_tree支持XML、JSON、INI和INFO等格式
+
+1）XML
+
+- property_tree本身没有实现XML解析器，而是使用了非Boost的开源项目rapidxml，因此，它的XML解析功能也受限于rapidxml
+- rapidxml是一个基于DOM模型的小而快的XML解析器，但它不完全支持XML标准，不支持DTD、名字空间，也不支持编码转换，默认为UTF-8格式
+- property_tree使用rapidxml将所有的XML节点转换为属性树对应的节点
+  * 节点的标签名是属性名，节点的内容是属性值，属性保存在<xmlattr>节点中
+  * 注释保存在<xmlcomment>中，文本内容（比如CDATA）保存在<xmltext>中
+- property_tree解析XML的方式有点像XPath/XQuery，但它并不能像XPath那样执行模糊查找、条件查找等
+- property_tree对XML的转换不是可逆的，如果再写回XML文件会丢失一些格式信息和空白字符，和原来的XML文件不完全相同，但XML的配置数据不变
+
+2）JSON
+
+- JSON也是一种常用的数据交换格式，它的结构紧凑，不像XML那么繁琐
+- 要解析JSON格式的数据，需要包含头文件<boost/property_tree/json_parser.hpp>，并使用read_json和write_json来读写配置，其他的用法和XML完全相同
+
+3）INI
+
+- INI格式是Windows下非常流行的一种配置数据的格式
+- 与XML和JSON相比，INI略显不足，它不支持多级层次，只有简单的key/value格式，无法表达复杂的配置，所以，其他格式的配置数据可能无法转换为INI格式
+- INI中的每个section被创建为一个属性树节点，section中的属性成为它的子节点，全局属性添加到属性树的根节点，而空的section不添加到属性树中
+- 要解析INI格式的数据，需要包含头文件<boost/property_tree/ini_parser.hpp>，并使用read_ini和write_ini来读写配置，其他的用法和XML完全相同
+
+4）INFO
+
+- INFO格式是property_tree的专用格式，它比XML简洁，其风格类似于JSON，但带有很多C++的特征，比如#include语句、字符转义等，很适合C++程序员使用
+- 要解析INFO格式的数据，需要包含头文件<boost/property_tree/info_parser.hpp>，并使用read_info和write_info来读写配置，其他的用法和XML完全相同
+- INFO的格式简单高效，适合于在程序中初始化大量的数据
+
+6、高级议题
+
+1）使用其他路径分隔符
+
+- property_tree默认使用.来分隔路径，但有的时候属性名中会包含.，此时还可以使用其他分隔符，比如/
+- get等函数的路径参数通常是字符串，但实际上它是一个basic_ptree::path_type类型，它是一个内部的typedef，真正的类型是string_path
+  * string_path的构造函数默认使用.作为路径分隔符，但也可以使用其他字符
+  * string_path还重载了operator /=，可以用来组合路径
+
+2）异常
+
+- 如果配置文件有误、属性树路径错误或数据不存在，property_tree就会抛出异常
+  * 配置文件的读写错误会抛出xxx_parser_error异常，比如，xml_parser_error
+  * property_tree本身的异常有三种，ptree_error、ptree_bad_data和ptree_bad_path，前者是property_tree库的异常基类，后两者从前者派生，这三个类都派生自std::runtime_error
+
+十一、总结
+
+- 本章介绍了10种Boost的容器和数据结构，它们从不同的方面扩展了标准容器
+- array是对C++内建数组的简单包装，增加了迭代器支持和一些有用的成员函数，使数组的行为更像标准容器，但在性能上并没有任何损失
+- dynamic_bitset类似于std::bitset，可以容纳任意数量的二进制位，用于位运算或者集合运算，它的最佳搭档是BOOST_BINARY，搭配使用可以获得最高的执行效率
+- unordered实现了符合C++标准的散列容器，它使用散列而不是二叉树来组织数据，大多数情况下可以提供比标准容器更好的性能
+- bimap是一个双向map，它扩展了std::map的内涵，引入了左组、右组、关系、视图、投射等概念，是一个强大的映射关系容器，通过配置不同的模板参数，它拥有很复杂的特性，在使用时应该谨记，简单够用的就是好用的
+- circular_buffer是一个循环队列，其操作类似于deque，很多应用程序都使用了生产者/消费者模式，其中会用到二者都需要使用的有界缓冲区，circular_buffer可以满足这个要求
+- tuple是对std::pair的泛化，它表现为一种类似于struct的数据类型，可以容纳任意类型的数据，方便对不同类型的数据打包，最常用的方式是用作函数的返回值，可以取代struct，不仅高效，而且可以通过很多泛型方法来操作它
+- any和variant都是只能容纳一个可变类型的容器
+  * 前者可以持有任意类型，后者则需要在模板参数中指明可以持有的类型，具有更好的安全性
+  * 在内部元素的访问方式上，前者只能使用any_cast，类似于转型操作，后者则可以使用get函数，同时还提供了访问器来编写更安全、更易维护的代码
+  * variant和tuple的声明都包含一个类型参数列表，但tuple是每个类型都对应一个元素，而variant是所有的类型对应到一个元素
+- multi_array是一个泛型的多维容器，比原始多维数组更灵活，可以在运行时改变维度、大小和索引基数，也可以使用子视图和切片来访问其中的一部分数据，大大简化了对多维数组的操作
+- property_tree可以解析XML/JSON/INI/INFO格式的配置文件，它在内部构造出一个属性树，通过类似XPath的简便语法来访问任意节点的数据
+
+<2022-11-24>
