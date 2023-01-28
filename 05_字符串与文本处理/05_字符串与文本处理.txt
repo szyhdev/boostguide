@@ -1,0 +1,521 @@
+第五章 字符串与文本处理
+
+一、lexical_cast
+  1、函数声明
+  2、用法
+  3、错误处理
+  4、转换要求
+  5、转换自定义类
+  6、对比标准
+二、format
+  1、简单的例子
+  2、输入操作符
+    1）为什么使用重载操作符
+    2）为什么使用operator %
+  3、类摘要
+  4、格式化语法
+  5、性能优化
+  6、高级用法
+三、string_ref
+  1、类摘要
+  2、用法
+四、string_algo
+  1、简单示例
+  2、算法概述
+  3、大小写转换
+  4、判断式（算法）
+  5、判断式（函数对象）
+  6、分类
+  7、修剪
+  8、查找
+  9、替换与删除
+  10、分割算法
+  11、合并算法
+  12、查找（分割）迭代器
+五、xpressive
+  1、使用方式
+  2、简介
+  3、类摘要
+    1）basic_regex
+    2）match_results
+    3）sub_match
+  4、正则匹配
+    1）简单的正则匹配
+    2）复杂的正则匹配
+    3）使用正则表达式结果
+    4）正则匹配的其他用法
+  5、正则查找
+  6、正则替换
+  7、正则迭代
+  8、正则分词
+  9、高级议题
+    1）工厂类
+    2）异常
+    3）格式化器
+    4）静态正则表达式
+    5）加速正则表达式
+    6）其他高级特性
+六、总结
+
+- 字符串和文本处理曾经一直是C++的弱项，C++98仅提供了标准字符串类std::string，它缺乏很多文本处理的高级特性
+- C++11引入了<regex>和<codecvt>，支持原始字符串，但这仍不够完善
+- Boost填补了这方面的空白，为整个C++社区做出了重要的贡献
+
+- 本章讨论Boost中字符串处理领域的五个组件
+  * lexical_cast和format，关注字符串的表示，可以将数值转换为字符串，并进行精确的格式化输出
+  * string_ref提供了字符串的“只读视图”，避免了字符串的拷贝代价，相当于const std::string&
+  * string_algo库提供了大量的字符串处理函数，可以满足90%以上的应用需求，剩下的10%需求可以由xpressive来完成
+  * xpressive是一个灵活的、功能强大的正则表达式分析器，同时也是一个语法分析器
+
+一、lexical_cast
+
+- 顾名思义，lexical_cast库用来对字面值进行转换，类似于C语言中的atoi函数，可以进行字符串与整数/浮点数之间的转换
+- lexical_cast位于名字空间boost，需要包含头文件<boost/lexical_cast.hpp>
+
+1、函数声明
+
+- C语言中的atoi/atof系列函数，可以将字符串转换为数字
+  * 但这种转换是不对称的，不存在itoa这样的反向转换（有的版本会提供类似的非标准函数）
+  * 要把数值转换为字符串，只能使用不安全的printf
+
+- lexical_cast使用类似于C++的标准类型转换符的形式给出了通用、一致的语法
+- 常用的lexical_cast的两种形式
+  * 第一种形式有两个模板参数，Target需要手动指定，Source则可以由函数参数推导出来
+  * 第二种形式专门处理C字符串，只接受一个Target模板参数，用来指明转换后的目标类型，函数参数chars和count指明了要转换的字符串及其范围
+
+2、用法
+
+- lexical_cast很容易使用，只需要在模板参数中指明转换的目标类型即可
+  * 待转换为数字的字符串中只能有数字和小数点，不能出现字母或其他非数字字符（表示指数的e/E除外）
+  * lexical_cast不支持高级的格式控制，不能把数字转换为指定格式的字符串，如果需要这种高级控制，应该使用std::stringstream或boost::format
+- lexical_cast也可以转换bool类型，但功能有限，只能转换“0”或“1”这样的字符串，不能处理true或false字面值
+
+3、错误处理
+
+- 当lexical_cast无法执行转换操作时，会抛出bad_lexical_cast异常，它是std::bad_cast的派生类
+- 为了使程序更健壮，在使用lexical_cast时，应该使用try-catch块来保护代码
+
+- lexical_cast在名字空间boost::conversion提供了try_lexical_convert函数来避免抛出异常，该函数用来判断转换是否能够成功
+- 利用try_lexical_convert函数可以验证数字字符串的合法性，这里实现了一个模板函数num_valid用于验证用户输入的有效性
+
+4、转换要求
+
+- 虽然lexical_cast的用法很像类型转换运算符，但其实它是一个模板函数
+- lexical_cast内部使用了标准库的流操作，因此，它对转换对象有以下要求
+  * 转换起点对象是可流输出的，即，支持operator <<
+  * 转换终点对象是可流输入的，即，支持operator >>
+  * 转换终点对象必须是可默认构造的、可拷贝构造的
+
+- C++的内置类型int、double和string都满足这些条件，它们是lexical_cast的最常用的工作搭档
+- 标准容器和其他自定义类型一般不满足上述条件，所以不能使用lexical_cast
+  
+5、转换自定义类
+
+- 要将lexical_cast应用于自定义的类，只需要满足lexical_cast的要求即可
+- 首先要实现流输出运算符operator <<
+  * 将实现流输出运算符operator <<的代码提取为一个模板类outable，可以简化编码
+  * 任何从outable模板类派生的类，都可以自动获得流输出运算符及lexical_cast的支持
+  * 如果想扩展outable类的功能，可以要求模板类型T提供to_string之类的函数来输出更详细的信息
+- 依据同样的原理，可以为自定义的类实现流输入运算符operator >>的重载
+
+6、对比标准
+
+- C++标准增强了字符串与数字的互操作性，提供stoX和to_string函数来实现std::string和数字之间的转换
+- 标准转换函数的用法与lexical_cast类似，优点是无需写模板参数，而且允许字符串中出现非数字的字符，它们会忽略起始的空格，直到遇到无法转换的字符为止
+- 但如果字符串不是以空格、数字开头或者超出了数字类型的范围，这些函数会抛出std::invalid_argument或std::out_of_range异常
+
+- 不过，C++标准没有采用类似lexical_cast的模板函数的方式，需要时可以模仿lexical_cast进行包装以便使用
+- 这里实现了一个std_lexical_cast模板类，并对int和long进行了模板特化，从而可以像lexical_cast那样方便地使用
+
+二、format
+
+- C++标准库提供的输入/输出流处理，可以对输出格式进行精确的控制，包括宽度、精度、填充字符、对齐等
+- 但是，这涉及大量的操控函数，而且会改变流的状态，用完之后还要及时恢复，有时候会显得十分繁琐
+- 因此，很多程序员会怀念C语言中经典的printf，它虽然缺乏类型检查，但语法简单高效，被广泛地接受和使用
+
+- format库扬弃了printf，实现了类似的格式化对象，可以将参数格式化到一个字符串，同时又是类型安全的，这已被收入C++20标准
+- format库位于名字空间boost，需要包含头文件<boost/format.hpp>
+
+1、简单的例子
+
+- 一个简单的例子：format("%s: %d + %d = %d\n") % "sum" % 1 % 2 % (1 + 2)
+  * format的设计参照了printf，但用法上有很大的不同
+  * format(...)构造了一个临时的格式化对象，构造函数的参数是格式化字符串，其语法和printf的相同
+  * 由于要格式化的参数的数目是不确定的，printf采用了C语言中的可变参数，但这是不安全的，format则重载了operator %，可以串联任意数量的参数，这类似于流操作符<<，可以理解为参数通过operator %被“喂”给format对象
+  * format支持流输出，可以直接向cout输出内部保存的已格式化好的字符串
+
+- format的另一种用法
+  * 首先，创建一个format格式化对象
+  * 然后，多次进行格式化操作，参数的数量必须满足格式化字符串的要求
+  * 最后，通过成员函数str来获得已格式化好的字符串，并向cout流输出
+- 类似于C#，format支持%N%的格式化语法，它用来指示参数的位置，可以减少参数输入的工作，这是对printf语法的一个改进
+
+2、输入操作符
+
+1）为什么使用重载操作符
+
+- format库在形成过程中考虑过许多形式的实现，比如，完全仿造printf，在函数里接收所有格式化参数
+  * 但是，基于类型安全的考虑，format不能使用省略号来实现可变参数，这就需要定义能够接收不同数量的参数的模板函数
+  * 如果编译器不支持可变参数模板，则无法满足格式化任意数目的参数的需求
+  * 因此，为了保持代码的兼容性，决定使用操作符来接收参数，就像流的operator <<那样，流的operator <<已应用多年，这证明它确实是有效的
+- operator %可以接受任意值作为参数，并返回format对象的引用，因此可以继续对返回的format对象执行%运算，以此类推，从而能够接受任意数目的参数
+
+2）为什么使用operator %
+
+- 为什么没有使用operator <<
+  * operator <<已经被用于流输出，如果format仍然使用operator <<，在编写代码时容易造成概念上的混乱，编译器无法区分哪些是用于流输出的，哪些是用于格式化的，结果不得不使用括号来限定format表达式
+  * 而且，format本身也支持流输出，还有其他算术运算符的优先级问题，这会进一步带来混乱
+- 其他一些操作符也是完全可行的，比如[]、()、,等，但都不像%那样能够清晰地表达格式化操作的意图
+- 最后就是习惯方面的原因，原来的printf的格式化字符串中就有%，这可以给用户带来亲切感，降低学习门槛
+
+3、类摘要
+
+- format并不是一个真正的类，而是一个typedef，其真正的实现是类basic_format
+- basic_format构造函数可以接受C字符串或std::string作为格式化字符串，该格式化字符串使用与printf类似的格式规则，构造函数都被声明为explicit，因此必须显式构造
+- 成员函数str返回format内部已格式化好的字符串，如果尚未得到所有的参数，则会抛出异常
+- 成员函数size可以获得已格式化好的字符串的长度，同样，如果尚未得到所有的参数，则会抛出异常
+- 成员函数parse清空format内部的缓存，改用一个新的格式化字符串
+- 成员函数clear清空format内部的缓存，将format对象恢复到初始状态
+- operator %用来接收参数，输入的参数的数量必须恰好等于格式化字符串要求的数量
+- operator <<用来向流输出已格式化好的字符串，相当于向流输出str()
+
+4、格式化语法
+
+- format基本上是继承了printf的格式化语法，仅有少量的不兼容，一般不会遇到
+- 每个printf格式化选项以“%”开始，后面是格式化规则，包括对齐、宽度、精度、字符类型等，format和它保持一致
+  * %05d：宽度为5的整数，不足位的补0
+  * %-8.3f：宽度为8、小数位为3的浮点数，左对齐
+  * % 10s：宽度为10的字符串，不足位的补空格
+  * %05X：宽度为5的大写十六进制整数，不足位的补0
+- 除此之外，format增加了一些新的格式
+  * %|spec|：和printf的格式相同，但两边增加了竖线，以便更好地区分格式化选项和普通字符
+  * %N%：标记第N个参数，只用来占位，不带任何格式化选项
+
+5、性能优化
+
+- printf不进行类型检查，直接向stdout输出，因此速度很快
+- format做了很多安全检查的工作，性能略差，速度会慢一些
+- 如果很在意format的性能，可以先创建一个const的format对象，然后在实际进行格式化操作时，通过它拷贝构造出对象，并进行格式化操作，这比直接构造format对象的速度更快
+
+6、高级用法
+
+- 除了通常的格式化字符串功能之外，format还有一些高级功能，比如，在运行时修改格式化选项、绑定输入参数等
+- 这些高级功能通过以下成员函数来完成
+  * bind_arg：把格式化字符串的第N位字符固定为val，即使调用clear也保持不变，除非调用clear_bind或clear_binds
+  * clear_bind：取消对格式化字符串的第argN位字符的绑定
+  * clear_binds：取消对格式化字符串的所有位置的字符的绑定
+  * modify_item：设置格式化字符串的第argN位的格式化选项
+  * group：设置输入/输出流操控器以指定的格式输入参数值（最多10个），其中，输入/输出流操控器位于头文件<iomanip>中
+
+三、string_ref
+
+- 在C++中处理字符串的基本工具是std::string，但它的构造成本较高，因为它必须持有完整的字符串的内容，极端情况下会影响程序效率
+- 使用const std::string&可以避免一些问题，但它在处理C字符串、提取子串时却无能为力
+
+- string_ref是一种轻量级的字符串，它只持有字符串的引用，没有内存拷贝代价，运行效率很高，是更好的const std::string&
+- string_ref已被收入C++17标准，但更名为string_view
+- string_ref库位于名字空间boost，需要包含头文件<boost/utility/string_ref.hpp>
+
+1、类摘要
+
+- string_ref库定义了basic_string_ref，其接口与std::string很类似
+- basic_string_ref的工作原理很简单，它不拷贝字符串，所以也不分配内存，只是通过两个成员变量ptr_和len_来标识字符串的起始位置和长度，这样就实现了字符串的表示
+- 注意，basic_string_ref是一个字符串的“常量视图”，大部分成员函数都是由const修饰的，只能像const std::string&那样观察字符串，而无法修改字符串
+- 和std::basic_string一样，basic_string_ref也定义了几个typedef以方便使用，包括string_ref、wstring_ref、u16string_ref、u32string_ref
+
+2、用法
+
+- string_ref的构造函数允许从字符串数组、std::string或者它们的一部分构造出来一个几乎没有成本的字符串视图
+- 虽然string_ref不能直接改变字符串，但可以通过remove_prefix和remove_suffix这两个函数修改内部的字符串指针和长度，以达到变动字符串引用的目的，当然，原始的字符串仍然没有被修改
+- string_ref的一个重要用途就是代替const std::string&作为函数的参数或返回值，从而避免字符串拷贝的代价，提高字符串处理效率
+- 由于string_ref持有的是弱引用，必须保证被引用的对象始终可用，所以要尽量避免长期持有或延后使用
+- 在确实需要持有字符串时，调用成员函数to_string可以获得一个拷贝副本来保证安全
+
+四、string_algo
+
+- 字符串类std::string有一些成员函数，用来查找子串、访问字符等，执行基本的字符串处理功能
+- std::string符合容器的定义，可以使用标准算法对它进行处理，但标准算法不是针对字符串定制的，所以显得有些笨拙
+
+- string_algo是一个非常全面的字符串算法库，可以在不使用正则表达式的情况下处理大多数与字符串相关的问题
+- string_algo库位于名字空间boost::algorithm，但被using语句引入到名字空间boost中
+- 使用string_algo库需要包含头文件<boost/algorithm/string.hpp>
+
+1、简单示例
+
+- 示例程序展示了ends_with、to_upper_copy、replace_first、erase_first_copy的用法，它们的含义不言自明
+- string_algo库中的算法是泛型算法，因此可以被用于容器，比如vector，而不局限于std::string和std::basic_string<T>
+
+2、算法概述
+
+- string_algo库被设计用来处理字符串，除了std::string和std::basic_string<T>之外，还可以处理任何符合boost.range要求的容器
+  * 容器内的元素不必是char或者wchar_t，任何可拷贝和可赋值的类型都可以
+  * 不过，如果拷贝和赋值的代价很高，string_algo的性能会显著下降
+- string_algo可以用于标准容器vector、deque、list以及string_ref上，当然，string_algo的主要操作对象仍然是string和wstring
+- string_algo基于boost.range，因此避免了标准算法必须提供begin()和end()迭代器的麻烦，也使得算法可以嵌套在一起串连地处理字符串
+
+- string_algo库中的算法的名称均采用小写形式，通过不同的词缀来区分不同的版本
+  * i：大小写不敏感
+  * _copy：不对输入进行修改，返回处理结果的拷贝
+  * _if：需要一个作为判断式的谓词函数对象作为判断准则
+- string_algo库中的算法分为五大类，大小写转换、判断式与分类、修剪、查找与替换、分割与合并
+
+3、大小写转换
+
+- string_algo的大小写转换算法包括to_upper、to_lower以及它们的_copy后缀版本
+  * 基本算法to_upper和to_lower直接在输入上改变大小写
+  * 它们的_copy后缀版本不改变输入的大小写，而是返回更改为大小写后的副本
+
+4、判断式（算法）
+
+- 判断式用来检测两个字符串之间的关系
+- string_algo的判断式包括lexicographical_compare、starts_with、ends_with、contains、equals、all
+  * 除了all之外，上述算法都还有一个i前缀的版本，解决了困扰C++程序员多年的大小写无关的字符串比较问题
+  * 同时，由于它们都不改变字符串，所以没有_copy版本
+  * 它们都有一个接受比较谓词函数对象的三参数版本，这一点违背了string_algo库的命名原则，即，没有使用_if后缀
+
+5、判断式（函数对象）
+
+- string_algo增强了标准库中的equal_to和less函数对象，允许对不同的字符串进行比较，并提供大小写无关的形式
+- string_algo的判断式包括is_equal、is_less、is_not_greater以及它们的大小写无关形式
+- 注意它们的调用方式，比如，is_equal()(str1, str2)，第一个括号生成了一个临时函数对象，第二个括号调用了该对象的operator ()进行比较
+
+6、分类
+
+- string_algo提供了一组分类函数，用来检测一个字符是否符合某种特性
+  * string_algo的分类函数包括is_space、is_alnum、is_alpha、is_cntrl、is_digit、is_graph、is_lower、is_print、is_punct、is_upper、is_xdigit、is_any_of、is_from_range
+  * 这些函数并不真正地检测字符，而是返回一个detail::is_classified函数对象，该函数对象的operator ()才是真正的分类函数，因此，这些函数都属于工厂函数
+
+- is_classified函数对象重载了逻辑运算符&&、||和!，所以可以将多个is_classified函数对象组合成逻辑表达式，以实现复杂的条件判断
+- 如果这些分类函数不能满足要求，可以自己实现专用的判断式，方法很简单，定义一个返回值为bool的函数对象或者lambda表达式即可
+
+7、修剪
+
+- string_algo提供了三个修剪算法，trim_left、trim_right、trim
+  * 修剪算法可以删除字符串开头或结尾部分的空格，它有_if和_copy两种后缀，因此，每种算法都有四个版本
+  * _if后缀的版本接受一个判断式，将所有使判断式为真的字符删除
+- 使用逻辑运算符组合多个判断式，可以一次删除多种字符
+
+8、查找
+
+- string_algo的查找算法提供与std::search类似的功能，但接口不太一样，它不是返回一个迭代器，而是返回查找到的区间（即，iterator_range），以便进行算法串联和其他操作
+- iterator_range在概念上类似于std::pair<iterator, iterator>，它包装了两个迭代器，可以用begin()和end()来访问，也可以作为容器来使用
+
+- string_algo提供的查找算法包括find_first、find_last、find_nth、find_head、find_tail
+  * 这些算法都不改动字符串，因此没有_copy后缀的版本
+  * 不过，前三个算法有i前缀的版本
+- iterator_range可以像标准容器那样判断是否为空，也可以隐式转换为bool值
+- string_algo还有三个查找算法这里不做介绍，它们是find_token、find_regex、find
+
+9、替换与删除
+
+- 替换和删除算法与查找算法很类似，在找到结果后会对字符串进行处理，所以，它们的名字很类似
+- 替换和删除算法包括replace/erase_first、replace/erase_last、replace/erase_nth、replace/erase_all、replace/erase_head、replace/erase_tail
+  * 前四对算法都有前缀i、后缀_copy的组合，所以，每个算法都有四个版本
+  * 后两对算法只有后缀_copy的版本，所以，每个算法都有两个版本
+
+10、分割算法
+
+- string_algo提供了两个字符串分割算法，find_all和split，可以通过某种策略把字符串分割为若干个部分，并将分割后的字符串放入指定的容器中
+- 分割算法对容器类型的要求是必须能够持有查找到的结果的拷贝或引用，因此，容器的元素的类型必须是string或iterator_range<string::iterator>，容器则可以是vector、list、deque等标准容器
+
+- find_all类似于普通的查找算法，它搜索所有匹配的字符串，并将其放入容器，它还有一个前缀i的版本
+- split使用判断式来确定分割的依据
+  * 如果一个字符满足该判断式，它就是一个分隔符
+  * 参数eCompress则用来指示连续的两个字符是否被视为一个字符
+
+11、合并算法
+
+- 合并算法是分割算法的逆运算，它把容器中的字符串连成一个新的字符串，并且可以指定连接符
+- join还有一个后缀_if的版本，它接受一个判断式，只有满足该判断式的字符串才会被合并
+
+12、查找（分割）迭代器
+
+- 除了通用的find_all和split之外，string_algo还提供了两个查找/分割迭代器，find_iterator和split_iterator，它们可以在字符串中像迭代器那样遍历匹配，进行查找或分割，不需要使用容器来容纳匹配的结果
+- 使用查找迭代器可以实现某些简单算法无法实现的功能
+  * 首先，声明迭代器对象find_iterator或split_iterator
+  * 然后，调用first_finder获得迭代器的初始位置，它用来判断要匹配的对象
+  * 接着，调用make_find_iterator来创建迭代器
+  * 此时就可以不断地遍历迭代器对象，直到无法找到匹配的对象
+
+- 和first_finder类似的查找函数还有last_finder、nth_finder、token_finder等
+- 分割迭代器可以使用任意长度的字符串作为分隔符，而普通的split算法只能以字符作为分隔符
+- 适当地使用auto/decltype可以简化查找迭代器的声明
+
+五、xpressive
+
+- 正则表达式是处理文本的强有力工具，它使用一套复杂而完善的语法规则，能够解决文本领域的绝大多数问题，这些问题用通常的字符串算法是很难甚至无法解决的
+- C++11标准增加了regex库，但在Boost库中有更好的选择，这就是xpressive
+- xpressive是一个先进的、灵活的、功能强大的库，提供对正则表达式的全面支持，其语法与C++标准中的std::regex类似
+
+1、使用方式
+
+- xpressive不仅是一个类似于std::regex的正则表达式解析器，还是一个类似于boost::spirit的语法分析器，它把这两种不相关的文本处理方式融合在一起了
+- xpressive的两种使用方式
+  * 静态方式：类似于boost::spirit，使用操作符重载来生成编译期的表达式对象，可以在编译期构建正则表达式甚至自定义语法
+  * 动态方式：类似于boost::regex，以字符串作为表达式对象，在运行时进行语法检查和处理
+
+- 这两种方式不是对立的，可以组合使用
+  * 如果想同时使用两种方式，可以包含头文件boost/xpressive/xpressive.hpp
+  * 如果仅使用静态方式，可以包含头文件boost/xpressive/xpressive_static.hpp
+  * 如果仅使用动态方式，可以包含头文件boost/xpressive/xpressive_dynamic.hpp
+- xpressive的静态方式使用表达式模板库boost.proto来构建，重载了大量的操作符，实际上定义了一套领域特定语言，对于初学者有一定难度，所以，下面的内容主要涉及动态方式
+- xpressive库位于名字空间boost::xpressive
+
+2、简介
+
+- 正则表达式定义了一套复杂的语法规则，用来匹配特定模式的字符串
+- 大部分字符都用来匹配自己，少量的字符则被用来定义特殊的匹配模式，包括.、^、$、()、*、+、?、{}、[]、\、|
+  * .：匹配任意的单个字符
+  * ^：匹配行的开头
+  * $：匹配行的结尾
+  * ()：匹配子元素
+  * *：前面的元素重复任意次（n >= 0）
+  * +：前面的元素重复一次或多次（n > 0）
+  * ?：前面的元素重复零次或一次（n == 0 || n == 1）
+  * {min,max}：手动指定元素重复的次数（n >= min && n <= max）
+  * []：匹配字符集合，可以列出单个字符，可以定义字符范围，也可以定义集合的补集
+  * \：转义字符，用来将特殊字符进行转义
+  * |：匹配它两侧的元素之一
+- 其中，\预定义了一些匹配模式，比如，\d匹配数字，相当于[0-9]，\w匹配字母，相当于[a-z]，\s匹配空格
+
+- 使用上述的基本规则进行组合，就可以定义出复杂的正则表达式匹配模式
+- 需要注意的是，C++11支持原始字符串，所以，可以通过R"(...)"的形式直接书写包括\的字符串，但C++98则不允许这样做，必须使用\\来代替\，这会带来一点儿麻烦
+- 另外，建议在使用正则表达式时添加注释来说明其原始表达式，以方便调试和维护
+
+3、类摘要
+
+- xpressive库提供了三个重要的类，basic_regex、match_results和sub_match
+
+1）basic_regex
+
+- basic_regex是xpressive库的核心，它封装了正则表达式的解析和编译
+- basic_regex是正则表达式的基本类，常用的则是两个typedef，sregex和cregex，前者用来操作std::string，后者用来操作C字符串
+- basic_regex的构造函数很简单，默认会构造一个空的正则表达式，也可以从另一个basic_regex对象拷贝构造或者赋值
+- 成员函数regex_id返回正则表达式的唯一标识，mark_count则返回正则表达式中匹配的子表达式的数目，对于空的正则表达式，这两个函数都返回0
+- basic_regex的核心是静态成员函数compile，它是一个工厂方法，可以根据正则表达式创建出一个basic_regex对象
+
+2）match_results
+
+- match_results是xpressive库中另一个重要的类，它保存了正则表达式匹配的结果
+- 和basic_regex一样，match_results也是基本类，常用的则是smatch和cmatch，前者用来操作std::string，后者用来操作C字符串
+
+3）sub_match
+
+- sub_match是一个类似迭代器对的对象，继承自std::pair，可以把它当做一个字符串的区间表示
+
+4、正则匹配
+
+- 函数regex_match用来检查一个字符串是否完全匹配一个正则表达式，返回值为bool
+- 函数regex_match有很多重载形式以支持各种应用情况
+  * 最简单的形式接受两个参数，第一个参数是要匹配的字符串，第二个参数是一个正则表达式对象
+  * 第二种形式可以接受一个额外的match_results参数，用来返回匹配到的字符串
+
+1）简单的正则匹配
+
+- 字符串"a.c"用来匹配三个字符，两端是a和c，中间可以是一个任意字符
+- cregex的静态工厂方法compile创建了一个正则表达式对象，用来对正则表达式进行匹配
+- 使用regex_match可以检查字符串是否和正则表达式匹配
+
+2）复杂的正则匹配
+
+- 使用复杂的正则表达式来匹配身份证号码
+  * 身份证号码由18位数字组成，前六位是地区编码，中间八位是年月日，最后四位数字的最后一位可能是X
+  * 对应的正则表达式是\d{6}、(1|2)\d{3}(0|1)\d[0-3]\d、\d{3}(X|\d)
+
+3）使用正则表达式结果
+
+- 通过添加子表达式，match_results可以提取匹配结果中的字段信息
+- 注意，每一对括号都代表一个子表达式，而且，子表达式中还可以包含子表达式
+- 按照子表达式的出现顺序，它们被基于1来编号，编号0则用来代表整个匹配的字符串表达式
+
+4）正则匹配的其他用法
+
+- regex_match还可以替代部分string_algo库的判断式算法，比如，starts_with和ends_with
+
+5、正则查找
+
+- 函数regex_search用来使用正则表达式的查找功能
+- 和regex_match检测输入的表达式是否与正则表达式完全匹配不同，regex_search检测输入的表达式中是否包含与正则表达式匹配的内容
+- 和regex_match类似，regex_search也有很多重载形式以支持各种应用情况
+- regex_search可以替代string_algo中的contains、starts_with、ends_with以及查找算法
+
+6、正则替换
+
+- 函数regex_replace用来使用正则表达式的替换功能，它先用正则表达式查找匹配的字符串，然后再用指定的格式将其替换
+- regex_replace的前两个参数和regex_match/regex_search的相同，第三个参数可以是一个简单的字符串，也可以是一个符合ECMA-262标准的带格式的字符串，可以用$N来代替第N个子表达式，也可以用$&来代替整个匹配的字符串表达式
+- 在替换完成后，regex_replace会返回结果字符串的拷贝
+- regex_replace可以替代string_algo中的修剪和删除算法
+
+7、正则迭代
+
+- xpressive库提供了一个强大的迭代器模板类，regex_iterator，它类似于string_algo的查找迭代器，可以遍历正则表达式匹配的结果
+- 在实际应用时，应当使用它的typedef形式，即，sregex_iterator或cregex_iterator
+- regex_iterator的构造函数要求传入一个容器区间和一个正则表达式对象，然后就可以通过operator ++对它进行遍历，并通过*或->获得匹配结果的match_results对象
+- regex_iterator可以替代string_algo中的查找算法和查找迭代器
+
+8、正则分词
+
+- xpressive库通过模板类regex_token_iterator提供了分词迭代器，它比string_algo的分词功能强大得多
+- regex_token_iterator同样不能直接使用，而应当使用它的typedef形式，即，sregex_token_iterator或cregex_token_iterator
+- regex_token_iterator和regex_iterator的用法大致相同，区别在于匹配结果的使用方式
+  * 在默认情况下，它返回匹配的字符串，这和regex_iterator相同
+  * 如果为最后一个参数传入-1，它会把匹配的字符串视为分隔符
+  * 如果为最后一个参数传入一个正数N，它会返回匹配结果的第N个字符串
+- regex_token_iterator和regex_iterator还有一点不同，它的解引用返回的是sub_match对象，而不是match_results对象
+
+9、高级议题
+
+1）工厂类
+
+- 除了可以使用sregex::compile来创建正则表达式对象，xpressive还提供了一个工厂类，regex_compiler
+- 通常不会直接使用regex_compiler，而是使用它的typedef形式，即，sregex_compiler或cregex_compiler
+- regex_compiler比regex::compile的功能更多，可以为它传入locale以支持本地化，也可以通过重载operator []来实现flyweight模式，还可以把它用作一个正则表达式对象池
+
+2）异常
+
+- 当xpressive编译不正确的正则表达式或执行其他操作出错时，会抛出regex_error异常
+- regex_error派生自std::runtime_error和boost::exception
+- 在使用xpressive时，应当总是使用try-catch来捕捉异常
+
+3）格式化器
+
+- 在使用regex_replace进行替换时，除了使用简单的字符串和格式化字符串，还可以使用格式化器
+- 格式化器是一个具有operator ()的可调用对象，函数指针、函数对象或者lambda表达式都可以，当然，它必须能够处理查找到的match_results对象
+
+4）静态正则表达式
+
+- 静态正则表达式具有和动态正则表达式相同的功能，但静态正则表达式对表达式的处理是在编译时，省去了运行时的开销
+- 如果程序对运行速度的要求较高，可以考虑使用静态正则表达式
+
+- 常用的静态正则表达式语法元素
+  * >>：连接两个正则表达式
+  * _：相当于.
+  * *、+、!：相当于*、+、?
+  * bos、eos：相当于^、$
+  * _d、_w、_s、_n：相当于\d、\w、\s、\n
+  * s1、s2、...：子表达式
+  * as_xpr()：从字符串产生一个正则表达式
+  * []：语义动作，在匹配发生时执行特定的功能
+
+5）加速正则表达式
+
+- 由于使用了正则表达式，所以，在程序中出现了两种语言，C++和正则表达式
+  * xpressive的静态方式在编译时同时进行C++和正则表达式的编译处理
+  * xpressive的动态方式在编译时只编译C++，在运行时只编译正则表达式
+- 与format库类似，编译正则表达式需要很多开销，应当尽量少做sregex或cregex的创建动作，尽可能重用
+- 同样，也应当尽可能重用smatch或cmatch，它们缓存了动态分配的内存，避免每次再重新分配
+
+6）其他高级特性
+
+- xpressive还支持其他高级特性，包括支持perl/sed的正则表达式语法、正则表达式语法嵌套、动态的命名捕捉、构建自定义语法等
+
+六、总结
+
+- lexical_cast是一个方便的用于转换数字和字符串的小工具，它代替了C中atoi系列函数，但当需要精细的格式控制或高级功能时，应该使用format库
+- format库提供了类似printf的能力，它使用%操作符代替了可变参数，是类型安全的，同时还增加了新的格式化选项、语法和其他高级功能，它的唯一缺点是，性能不如printf好，但这完全不能掩盖它所具有的巨大优势
+- string_ref是轻量级的字符串表示，功能和std::string一样，但操作起来只需要很低的成本，可以代替const std::string&来提高字符串的处理效率
+- string_algo是个算法库，为字符串和文本的处理提供了大量的算法，包括trim、join、split等
+- xpressive是一个灵活而强大的正则表达式解析库，它可以构建小型语法，同时提供动态方式和静态方式两种用法，轻松地解决文本处理领域中的大多数问题，它基本可以替代string_algo库
+- 正则表达式是一门复杂的技术，解决同样的问题string_algo的速度可能更快，所以，只有在string_algo确实无法解决问题的情况下，才使用正则表达式
+
+<2022年10月10日>
