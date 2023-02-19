@@ -699,7 +699,7 @@
 
 - 可以像使用any那样使用variant，先通过type检查variant的类型，然后再进行实际的操作
   * 不过，这种方式使用了RTTI技术，效率较低
-  * 而且,如果variant的模板参数发生了变化，这些代码也需要相应地进行修改
+  * 而且，如果variant的模板参数发生了变化，这些代码也需要相应地进行修改
 - 为此，variant基于访问者模式提供了模板类static_visitor，其构造函数和析构函数都被声明为保护的，所以只能被继承使用
   * 首先，实际的访问器从static_visitor继承，重载operator ()，用来访问variant的值
   * 为了能够处理variant的所有可能的类型，operator ()被声明为模板函数，用来处理普通类型
