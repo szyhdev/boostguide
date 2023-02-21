@@ -1,0 +1,421 @@
+第二章 时间与日期
+
+一、timer库概述
+二、timer
+  1、用法
+  2、类摘要
+  3、使用建议
+三、progress_timer
+  1、用法
+  2、类摘要
+四、date_time库概述
+  1、使用方式
+  2、基本概念
+五、处理日期
+  1、日期
+  2、创建日期对象
+  3、访问日期
+  4、日期的输出
+  5、转换C结构
+  6、日期长度
+  7、日期运算
+  8、日期区间
+  9、日期区间运算
+  10、日期迭代器
+  11、其他功能
+  12、综合运用
+    1）显示月历
+    2）简单的日期计算
+    3）计算信用卡的免息期
+六、处理时间
+  1、时间长度
+  2、操作时间长度
+  3、时间精确度
+  4、时间点
+  5、创建时间点对象
+  6、操作时间点对象
+  7、转换C结构
+  8、时间区间
+  9、时间迭代器
+  10、综合运用
+    1）高精度计时器
+    2）计算工作时间
+七、date_time库的高级议题
+  1、编译配置宏
+  2、自定义字面值
+  3、格式化时间
+  4、本地时间
+八、总结
+
+- 一直以来，C++缺乏对时间和日期的处理能力，不得不借助C语言，使用其笨拙的结构和函数
+- 无法忍受这种情形的程序员手动构建了自己的实现以满足开发所需，这涉及大量的重复工作
+- Boost库提供了timer、date_time和chrono来解决这个问题，由于chrono与操作系统联系较密切，所以放到第十章中讲解
+
+一、timer库概述
+
+- timer是个很小的库，可以提供简单的度量时间的功能，也可以用于性能测试等需要计时的任务，它适用于大多数情况
+- Boost 1.48以后，timer库由两个组件构成，早期的timer(V1)和新的cpu_timer(V2)，前者使用标准的C/C++库函数，后者则基于chrono库使用操作系统的API，计时精度更高
+  * V1版的timer的计时精度较低，Boost官方已经不再推荐使用，但对于初学者来说，它仍然有一定的学习价值
+  * timer(V1)库包括两个小部件，timer和progress_timer
+
+二、timer
+
+- timer可以测量时间的流逝，是一个小型的计时器，可以提供毫秒级别的计时精度，它就像一个秒表
+- timer位于boost名字空间，需要包含头文件<boost/timer.hpp>
+
+1、用法
+
+- timer对象一旦被声明，它的构造函数就启动了计时工作，之后就可以通过elapsed函数测量对象创建后流逝的时间
+- 函数elapsed_min返回timer能够测量的最小时间单位，函数elapsed_max返回timer能够测量的最大时间范围，它们的单位都是秒
+
+2、类摘要
+
+- timer非常小，全部实现不过70余行，真正的实现只有不到20行
+- timer的计时使用了标准库中的std::clock函数，它位于头文件<ctime>中，返回自进程启动以来的clock数，每秒的clock数由宏CLOCKS_PER_SEC来定义
+
+- timer的构造函数记录当前的clock数，作为计时的起点，并将其保存到成员变量_start_time中
+- 函数elapsed_min返回timer能够测量的最小时间单位，它是CLOCKS_PER_SEC的倒数
+- 函数elapsed_max使用了标准库的numeric_limits来获得clock_t类型的最大值，进而计算出能够测量的最大时间范围
+- timer没有析构函数，因为它只有一个类型为clock_t的成员变量，没有资源需要释放
+
+3、使用建议
+
+- timer接口简单，适用于大部分要求不高的程序计时任务，但使用timer时必须理解elapsed_min和elapsed_max的含义，它们表明了timer的能力
+- timer不适合高精度的时间测量任务，它的精度依赖于操作系统或编译器，难以做到跨平台
+- timer也不适合于测量大跨度的时间段，如果需要以天、月甚至年为时间单位，则不能使用timer，而应该使用第十章中的cpu_timer
+
+三、progress_timer
+
+- progress_timer也是一个计时器，它派生自timer，会在析构时自动输出时间，省去了timer手动调用elapsed函数的工作
+- progress_timer位于boost名字空间，需要包含头文件<boost/progress.hpp>
+
+1、用法
+
+- progress_timer继承了timer全部的功能，可以像使用timer一样使用它
+- progress_timer的使用更简单，不需要任何调用，只需要声明progress_timer对象，当离开该对象的作用域时，它会自动输出流逝的时间
+- 如果需要在一个程序中测量多个时间，可以用花括号限定多个progress_timer对象的作用域
+
+2、类摘要
+
+- progress_timer的接口与timer相同，也很简单
+- 唯一需要注意的是，progress_timer的构造函数允许指定析构时输出的流，默认情况下是cout，如果有特别的需求，可以将它替换为其他标准库输出流或者使用cout.rdbuf重定向cout的输出
+
+四、date_time库概述
+
+- 日期和时间就像整数和字符串一样经常出现，但精确地操纵时间非常困难，它本身就是一个难以度量的实体，可以有很多变化
+- 现实生活中存在着多个时间度量体系，非常复杂，比如，儒勒历、格里高利历、农历、印加帝国的太阳历、UTC等
+- 想要实现一个可以计算各种日期和时间的库难度相当大，date_time库勇敢地面对了这个挑战，并成功地解决了大部分问题
+  * 它可以提供与时间相关的各种功能，支持无限时间和无效时间这样在实际生活中有用的概念
+  * 它还可以与C语言中的tm结构相互转换，提供向下支持
+
+1、使用方式
+
+- date_time库需要编译才能使用
+- date_time库包括两个部分，处理日期的gregorian和处理时间的posix_time
+  * 前者位于名字空间boost::gregorian，需要包含头文件<boost/date_time/gregorian/gregorian.hpp>
+  * 后者位于名字空间boost::posix_time，需要包含头文件<boost/date_time/posix_time/posix_time.hpp>
+
+2、基本概念
+
+- 如果把时间想象成一个向前和向后无限延伸的实数轴，那么时间点就是数轴上的一个点，时间段就是两个时间点之间的区间，时间长度则是两个时间点之差，它是一个带正负号的标量，不属于数轴
+- 时间点、时间段和时间长度之间可以进行运算，比如，时间点 + 时间长度 = 时间点，当然，有些运算是无意义的，比如，时间点 + 时间点，基于生活常识，很容易理解这些计算
+
+- date_time库支持无限时间、无效时间等，它们类似于数学上的极限的概念，其中，时间点和时间长度都有无限的值，它们的运算规则比较特别，比如，无限时间点 + 时间长度 = 无限时间点
+- date_time库使用枚举special_values定义这些特殊的时间概念，它们位于名字空间boost::date_time中
+  * pos_infin：正无限
+  * neg_infin：负无限
+  * not_a_date_time：无效时间
+  * min_date_time：可以表示的最小日期或时间
+  * max_date_time：可以表示的最大日期或时间
+
+五、处理日期
+
+- 首先来研究date_time库的日期部分，因为它只涉及年、月、日，不需要处理时、分、秒，更容易学习一些
+- date_time库的日期基于格里高利历，支持从1400-01-01到9999-12-31之间的日期计算
+- 它位于名字空间boost::gregorian，需要包含头文件<boost/date_time/gregorian/gregorian.hpp>
+
+1、日期
+
+- date是date_time库处理日期的核心类，它使用一个32位的整数作为内部存储，以天为单位表示时间点
+- date是一个轻量级对象，处理效率很高，可以被拷贝传值，全面支持比较操作和流输入输出，完全可以把它当作一个类似于int、string那样的基本类型来使用
+
+2、创建日期对象
+
+- date的空的构造函数会创建一个值为not_a_date_time的无效日期，如果顺序传入年、月、日则可以创建一个对应日期的date对象
+- date允许从一个字符串产生，这需要用到工厂函数from_string或者from_undelimited_string，前者使用分隔符（斜杠或连字符）来分隔年、月、日，后者是无分隔符的纯字符串
+
+- day_clock是一个天级别的时钟，它是一个工厂类，静态成员函数local_day和universal_day分别返回一个当天的本地日期对象和UTC日期对象
+- day_clock的内部使用了C标准库的localtime和gmtime函数，因此，这些成员函数的行为依赖于操作系统的时区设置
+
+- 使用一些特殊的枚举值可以创建一些特殊的日期，比如，neg_infin、pos_infin、not_a_date_time、max_date_time、min_date_time等
+- 如果在创建日期对象时使用了非法值，比如，日期超出了1400-01-01到9999-12-31的范围或者使用了不存在的月份或日期，date_time会抛出异常，可以通过what获得具体的错误信息
+
+3、访问日期
+
+- date的接口很像C语言中的tm结构，可以获取它保存的年、月、日、星期等
+  * 成员函数year、month、day分别返回日期的年、月、日
+  * 成员函数year_month_day返回一个date::ymd_type结构，可以一次性地获得年、月、日
+  * 成员函数day_of_week返回日期的星期数，0表示星期天，day_of_year返回日期是当年的第几天，最大值为366，而end_of_month则返回当月的最后一天的date对象
+  * 成员函数week_number返回日期所在的周是当年的第几周，其取值范围为0~53
+
+- date还有5个is_xxx函数，用来判断某个日期是否是一个特殊日期，包括is_infinity、is_neg_infinity、is_pos_infinity、is_not_a_date、is_special
+
+4、日期的输出
+
+- date可以方便地转换为字符串，它提供了三个自由函数
+  * to_simple_string：转换为YYYY-mmm-DD格式的字符串
+  * to_iso_string：转换为YYYYMMDD格式的字符串
+  * to_iso_extended_string：转换为YYYY-MM-DD格式的字符串
+- date也支持流输入输出，默认使用YYYY-mmm-DD的格式
+
+5、转换C结构
+
+- date支持与C语言中的tm结构相互转换
+  * to_tm：将date转换为tm
+  * date_from_tm：将tm转换为date
+
+6、日期长度
+
+- 日期长度是以天为单位的时间长度，它是度量时间长度的一个标量
+- 和日期不同，它可以是任意整数，可正可负
+
+- 基本的日期长度类是date_duration
+  * 如果为构造函数传入special_values枚举值，则可以构造出一个特殊日期长度
+  * 成员函数days返回日期长度的天数
+  * 成员函数is_special和is_negative判断对象是否为特殊值
+  * 成员函数unit返回日期长度的最小单位，即，date_duration(1)
+
+- date_duration支持比较操作，也支持加减法和递增递减操作，用起来很像一个整数
+- 此外，它还支持除法运算，可以除以一个整数，但不能除以另一个日期长度，也不支持整数的其他数学运算，比如，乘法、取模、取余等
+- date_time为date_duration定义了一个更常用的名字，days，它更好地说明了日期长度的含义，计量天数
+
+- 为了方便计算时间长度，date_time还提供了years、months、weeks三个时间长度类，分别表示年、月、星期，其含义和days类似，但行为不太相同
+  * years和months全面支持加减乘除运算，其成员函数number_of_years和number_of_months可以获得其表示的年数和月数
+  * weeks则是date_duration的派生类，除了构造函数会以7天为单位之外，其他行为与days相同
+
+7、日期运算
+
+- date支持加减运算，但两个date对象之间的加法是无意义的，这会导致一个编译错误
+- date对象主要是和日期长度对象进行运算
+  * 日期与特殊日期长度或者特殊日期与日期长度进行运算的结果还是特殊日期
+  * 与years、months或weeks进行运算时，如果日期是月末的最后一天，加减月或年会得到同样的月末时间，这是合乎常识的，但如果天数是月末的28日或29日时，加减月份到2月，那么随后的结果就总是月末，原来的天数信息就丢失了，使用days则不会出现上述问题
+  * 如果担心上述问题的干扰，可以通过取消宏BOOST_DATE_TIME_OPTIONAL_GREGORIAN_TYPES来避免包含定义它们的头文件<boost/date_time/gregorian/greg_duration_types.hpp>
+
+8、日期区间
+
+- date_period用来表示日期区间，它是时间轴上的一个左封闭、右开放的区间，两个端点都是date对象
+- 日期区间的左边界必须小于右边界，否则date_period表示的是一个无效的日期区间
+
+- date_period可以通过指定区间的两个端点来构造，也可以通过指定左端点和时间长度来构造，通常后一种方法更常用，相当于生活中从某一天开始的一个周期
+- 成员函数begin和last返回日期区间的两个端点，end则返回last之后的第一天，这和标准容器的end含义相同，表示一个超过尾部的位置，而length则返回日期区间的长度，单位为天
+- 如果日期区间的左端点大于右端点或者日期区间的长度为0，成员函数is_null将返回true
+
+- date_period支持全序比较运算，但它依据的不是日期区间的长度，而是第一个区间的end和第二个区间的begin，判断这两个区间在时间轴上的位置大小，如果这两个区间相互重叠或包含，比较就没有意义
+- date_period还支持输入输出运算符，默认的输入输出是一个YYYY-mmm-DD格式的字符串
+
+9、日期区间运算
+
+- 成员函数shift用来将日期区间平移n天，但长度不变
+- 成员函数expand用来将日期区间向两端延伸n天，相当于区间的长度增加了2n天
+- date_period提供了一些成员函数来判断某个日期是否在区间内，同时还可以计算日期区间的交集
+  * is_before/is_after：日期区间是否在某个日期之前/之后
+  * contains：日期区间是否包含另一个日期区间或日期
+  * intersects：两个日期区间是否存在交集
+  * intersection：返回两个日期区间的交集
+  * is_adjacent：两个日期区间是否相邻
+- date_period提供了两种并集操作
+  * merge：返回两个日期区间的并集，如果日期区间没有交集，则返回无效区间
+  * span：合并两个日期区间及其之间的间隔
+
+10、日期迭代器
+
+- date_time为处理日期提供了日期迭代器，这样就可以通过递增或递减操作来连续访问日期
+  * 这些迭代器包括day_iterator、week_iterator、month_iterator和year_iterator，分别以天、星期、月、年为单位
+  * 这些日期迭代器的用法类似，都需要在构造时传入起始日期和增减步长，然后就可以通过递增或递减操作来改变日期
+- 需要注意的是，这些迭代器并不符合标准迭代器的定义，因为没有difference_type、pointer、reference等内部类型定义，所以不能使用std::advance或operator +=来前进或后退
+
+11、其他功能
+
+- boost::gregorian::gregorian_calendar提供了格里高利历的一些操作函数，但这些函数一般只被date类在内部使用，用户很少会用到
+- 但同时它也提供了几个有用的静态函数，比如，is_leap_year用来判断某年是否是闰年，end_of_month_day用来根据指定的年和月来返回该月的最后一天
+- date_time库还提供了很多有用的日期生成器，比如，某月的最后一个星期天或第一个星期一，它们封装了一些常用但计算起来比较麻烦的时间概念
+
+12、综合运用
+
+1）显示月历
+
+- 这里实现一个打印月历的功能，用户指定一个日期，就可以得到该日期所在月的起始日期和结束日期，进而打印出当月的所有日期
+
+2）简单的日期计算
+
+- 计算一个人18岁的生日是星期几、当月有几个星期天以及当年有多少天
+- 其实，计算当年的天数没有必要通过累加每个月的天数来实现，简单地判断一下该年是不是闰年就可以了
+
+3）计算信用卡的免息期
+
+- 计算信用卡的免息期
+  * 使用信用卡的当天是消费日，信用卡每月有一个记账日，在记账日之后有一个固定的免息还款期限，通常是20天
+  * 因此，免息期就是消费日到下一个记账日的时间加上还款期限，最长可达50天
+- 可以把credit_card放入标准容器，并对其进行排序，这样就可以管理更多的信用卡，可以使用函数对象或者lambda表达式来保存消费日期，并作为比较谓词传递给排序算法
+
+六、处理时间
+
+- date_time在格里高利历的基础上提供了微秒级别的时间系统，如果需要，最高可以达到纳秒级别的精确度
+- date_time库的时间功能位于名字空间boost::posix_time，需要包含头文件<boost/date_time/posix_time/posix_time.hpp>
+- 从概念上讲，时间是日期的进一步细化，相当于在日期的“天”的量级下增加了时、分、秒
+
+1、时间长度
+
+- 和日期长度类似，date_time库使用time_duration来度量时间长度
+- time_duration很像C语言的tm结构中的时、分、秒，还可以精确到微秒
+- 如果在包含头文件之前定义宏BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG，它还可以精确到纳秒
+
+- time_duration有几个派生类，用来度量不同的时间分辨率，包括hours、minutes、seconds、millisec、microsec和nanosec
+- time_duration支持全序比较操作和输入输出，还支持加减乘除运算
+
+2、操作时间长度
+
+- time_duration可以在构造时指定时、分、秒、微秒
+- 时、分、秒、微秒可以是任意的数值，不一定必须在它们的限度内，超出的部分会自动进位或借位
+- 使用time_duration的派生类可以更直观地创建时间长度
+- 使用工厂函数duration_from_string可以从一个字符串创建时间长度对象，字符串中的时、分、秒、微秒需要用冒号隔开
+
+- time_duration中的时、分、秒可以通过hours、minutes、seconds等成员函数来访问
+- 成员函数total_seconds、total_milliseconds、total_microseconds分别返回时间长度的总秒数、总毫秒数和总微秒数，而fractional_seconds则以long类型返回微秒数
+- time_duration可以取负值，成员函数is_negative用来判断它的正负号，而invert_sign用来改变它的正负号，生成一个新的时间长度
+- time_duration可以被赋予特殊时间值，包括not_a_date_time、pos_infin等，同样也有is_xxx函数来判断是否是特殊时间，这和date、date_duration类似
+- time_duration支持完整的比较操作和加减乘除运算，因此比date对象更容易处理
+
+- 自由函数to_simple_string和to_iso_string用来获得time_duration的字符串表示，返回的格式分别为HH:MM:SS.fffffffff和HHMMSS,fffffffff
+- time_duration通过to_tm成员函数支持到tm结构的转换，但不能进行反向转换
+
+3、时间精确度
+
+- date_time库的默认时间精确度是微秒，纳秒相关的类和函数都不可用，秒以下的时间度量都使用微秒
+- 但当定义了宏BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG时，time_duration的行为会发生变化，它的时间分辨率将达到纳秒，秒以下的时间度量都使用纳秒
+- 成员函数fractional_seconds仍然返回时间的小数部分，但单位是纳秒，这也是为什么它的名称不是milli_seconds或nano_seconds的原因
+
+- 静态成员函数unit返回一个time_duration对象，它是time_duration的最小计量单位，在默认情况下是微秒，在定义了宏BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG时则变成纳秒
+- 静态成员函数resolution返回时间长度的分辨率，这是一个time_resolutions的枚举值，而num_fractional_digits返回时间的小数部分的位数，在微秒分辨率下是6，在纳秒分辨率下是9
+
+- 宏BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG主要影响对time_duration的构造函数中的时间的小数部分的解释
+- 如果要编写与分辨率无关的代码，可以使用millisec/milliseconds或microsec/microseconds这些预定义好的时间单位来创建时间长度
+
+- 成员函数ticks_per_second是对C中的宏CLOCKS_PER_SEC的强化，它返回每秒内的tick数，可以利用它来编写与时间精度无关的代码
+- 在大多数情况下，程序都不会用到纳秒级的计时精度，微秒级的计时精度已经足够了
+- 以上讨论对纳秒粒度也是适用的，除了时间分辨率的粒度不同之外，它们的其他行为都是一致的
+
+4、时间点
+
+- 时间点相当于一个日期加上一个小于24小时的时间长度，如果时间轴的单位是天，日期就相当于整数部分，时间点就相当于天之间的小数部分
+- ptime是date_time处理时间的核心类，它使用64位或96位整数在内部存储数据，分别提供微秒级和纳秒级的精确度，依赖于date和time_duration，所以它的接口很小
+- ptime是一个轻量级的对象，可以高效地拷贝和赋值，支持比较运算和加减乘除运算
+
+5、创建时间点对象
+
+- 最基本的创建时间点的方法是在构造函数中指定date和time_duration，使该对象等于一个日期加上一个时间偏移量，如果不指定time_duration，就默认为当天的零点
+- ptime也可以使用工厂函数time_from_string和from_iso_string从字符串构造，前者使用分隔符来分隔日期和时间，后者则是连续的数字，日期与时间之间用T隔开
+
+- date_time库也为ptime提供了时钟类来产生时间，second_clock和microsec_clock分别提供秒级和微秒级的分辨率，它们的接口是相同的，成员函数local_time和universal_time分别用来获得当前的本地时间和UTC时间
+- ptime可以构造为特殊时间值，同样也有is_xxx函数来判断是否是特殊时间值
+
+6、操作时间点对象
+
+- 由于ptime相当于date加上time_duration，对它的操作也分解为这两个部分
+- 成员函数date和time_of_day分别用来获得时间点中的日期和时间长度
+- ptime支持比较运算和加减运算，其运算规则和日期类似
+
+- ptime提供了三个自由函数来转换为字符串
+  * to_simple_string：转换为YYYY-mmm-DD HH:MM:SS.ffffff格式的字符串
+  * to_iso_string：转换为YYYYMMDDTHHMMSS,ffffff格式的字符串
+  * to_iso_extended_string：转换为YYYY-MM-DDTHH:MM:SS,ffffff格式的字符串
+- 其中的ffffff部分是秒的小数部分，如果为0则不显示，T则是日期和时间的分隔符
+
+7、转换C结构
+
+- 使用to_tm函数，可以将ptime转换为tm结构，转换规则是将date和time_duration组合
+- 使用ptime_from_tm函数则可以将tm结构转换为ptime
+- 函数from_time_t和to_time_t用来在time_t和ptime之间进行转换
+
+8、时间区间
+
+- 和日期区间date_period相对应，date_time也有时间区间的概念，time_period
+- time_period使用ptime作为时间区间的两个端点，区间同样是左封闭、右开放
+- 和date_period一样，成员函数begin和last返回时间区间的两个端点，length返回时间区间的长度，shift和expand用来改变时间区间，也能计算时间区间的交集和并集
+
+9、时间迭代器
+
+- 和日期迭代器不同，时间迭代器只有一个，time_iterator，在构造时传入一个ptime对象作为起始时间点和一个time_duration对象作为步长
+- 通过前置的operator ++和operator --就可以完成递增或递减操作
+
+10、综合运用
+
+1）高精度计时器
+
+- 利用ptime实现一个高精度计时器，ptimer，它可以取代前面介绍的timer和progress_timer
+  * ptimer的实现原理和timer一样，在创建对象时就启动计时，elapsed函数可以返回流逝的时间，析构时也会自动输出时间
+  * 和timer不同的是，ptimer利用date_time库的高精度时间度量功能来提供微秒级的计时，如果需要，还可以精确到纳秒级别
+- 为了支持date_time库的两个时钟类，second_clock和microsec_clock，可以把ptimer实现为一个模板类basic_ptimer，然后用定制时钟类的方式就可以实现两个精度分别为微秒和纳秒的计时器
+
+2）计算工作时间
+
+- 使用time_period来表示工作日的工作时间，并根据当前时间给用户一个友好的提示信息
+  * 假设工作日每天八个小时，早上9:00上班，中午12:30到13:30为午餐时间，下午6:00下班
+  * 于是，一天可以分为五个时间段，上班前、上午、中午、下午和下班后
+  * 由于time_period支持比较操作，因此，可以用std::map来保存时间段和问候语之间的映射关系
+- 定义一个work_time类，来保存上述逻辑关系
+  * 成员变量map_ts用来保存时间段和问候语之间的对应关系
+  * 成员函数init是work_time的核心，负责初始化时间段和问候语之间的映射关系
+  * 成员函数greeting遍历map_ts来判断一个时间点位于哪个时间区间，并输出相应的问候语
+
+七、date_time库的高级议题
+
+1、编译配置宏
+
+- 宏DATE_TIME_NO_DEFAULT_CONSTRUCTOR可以禁止编译器创建date和ptime的默认构造函数，强制它们在构造时必须提供一个有效的值，从而避免某些因疏忽导致的错误
+
+- 宏BOOST_DATE_TIME_OPTIONAL_GREGORIAN_TYPES启用了weeks、months、years等日期区间的便捷类型，它们可以使代码更清晰易懂，但在进行日期运算时有时会产生非预期的结果
+- 如果不想使用它们，就取消这个宏的定义，总是使用days以保证代码的正确性
+
+- 宏BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG将启用date_time库的更高级别的时间精确度，由微秒变为纳秒，同时与纳秒相关的一些函数和类也会被启用
+- 在默认情况下该宏是关闭的，因为纳秒精度很依赖于操作系统，而且实际生活中很少用到这么高的精度
+- date_time库编译的对象是格里高利历的源代码，不使用纳秒来处理日期，因此，该宏对date_time库的编译没有影响
+
+2、自定义字面值
+
+- C++11标准新增了自定义字面值的特性，可以用来简化与日期和时间相关的代码
+
+3、格式化时间
+
+- date_time库默认的日期时间格式简单、标准，而且是英文，但这些格式是可以改变的
+- 专门的格式化对象date_facet、time_facet等搭配输入输出流，就可以定制日期和时间的格式
+- 就像printf那样，这些格式化对象使用一个格式化字符串来定制日期或时间的格式，同样有大量的格式标志符
+
+4、本地时间
+
+- 考虑到世界各地不同时区的因素，再加上某些地区的夏令时，时间因素就变得复杂了
+- date_time库使用time_zone_base、posix_time_zone、custom_time_zone、local_date_time、c_local_adjustor等类和一个文本格式的时区数据库来解决本地时间中时区和夏令时的问题
+- 本地时间功能位于名字空间boost::local_time，需要包含头文件<boost/date_time/local_time/local_time.hpp>
+  * time_zone_base是时区表示的抽象类
+  * local_date_time是一个含有时区信息的时间对象
+
+- 为了便于时区编程，date_time库自带了一个小型的CSV格式的文本数据库，date_time_zonespec.csv，位于libs/date_time/data目录下，可以自由使用
+- 这个数据库几乎包含了世界上所有国家和地区的时区信息，类tz_database专门用来管理这个数据库
+
+八、总结
+
+- 本章讨论了Boost中与日期和时间有关的两个库，timer和date_time
+- timer和progress_timer是两个用于计时的小工具，使用了C++标准库中的std::clock，其精度不高但能满足日常使用
+  * progress_timer利用析构函数在离开作用域时自动显示时间
+  * 如果需要更高精度的计时，应该使用timer库的另一个组件，cpu_timer
+  * progress_timer私有继承了noncopyable类，以防止无意的拷贝破坏了正常的行为
+- date_time库提供了基于格里高利历的日期和时间处理，功能非常全面
+- date_time库支持时间点、时间长度、时间区间等基本概念，提供了从年、月、日到时、分、秒、微秒以及纳秒等不同级别的时间分辨率，可以进行比较、加减等运算
+- 日期和时间的处理很复杂，date_time库提供了很多工具来简化工作
+  * 使用日期迭代器和时间迭代器以指定的时间间隔来遍历时间
+  * 利用时钟类获得所需精度的本地时间
+  * 将时区与本地时间转换
+  * 定制日期和时间的输出格式
+- date_time库也有小小的缺憾，它不能处理1400年之前的日期，但总的来说它的贡献是卓越的
+
+<2022-9-28>
