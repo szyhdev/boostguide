@@ -7,7 +7,8 @@ using namespace std;
 #include <boost/config.hpp>
 using namespace boost;
 
-int main() {
+int main()
+{
     cout << BOOST_VERSION << endl;
     cout << BOOST_LIB_VERSION << endl;
     cout << BOOST_PLATFORM << endl;
@@ -16,4 +17,3 @@ int main() {
 
     return 0;
 }
-
